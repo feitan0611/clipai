@@ -1,0 +1,32 @@
+# Environnement Python
+venv/
+env/
+.env
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Django
+db.sqlite3
+*.sqlite3
+media/
+staticfiles/
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+.pytest_cache/
+htmlcov/
+.coverage
