@@ -9,7 +9,7 @@ import os
 def _serve_html(filename: str):
     """Retourne une view qui sert un fichier HTML depuis la racine du projet."""
     def view(request):
-        path_ = os.path.join(settings.BASE_DIR.parent, filename)
+        path_ = os.path.join(settings.BASE_DIR, filename)
         try:
             with open(path_, encoding='utf-8') as f:
                 return HttpResponse(f.read(), content_type='text/html; charset=utf-8')
@@ -21,7 +21,7 @@ def _serve_html(filename: str):
 def _serve_js(filename: str):
     """Retourne une view qui sert un fichier JS depuis la racine du projet."""
     def view(request):
-        path_ = os.path.join(settings.BASE_DIR.parent, filename)
+        path_ = os.path.join(settings.BASE_DIR, filename)
         try:
             with open(path_, encoding='utf-8') as f:
                 return HttpResponse(f.read(), content_type='application/javascript; charset=utf-8')

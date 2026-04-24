@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="fr" x-data="app()">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClipAI — Générateur de Clips Viraux</title>
+
+  <!-- Tailwind CSS Play CDN — servi localement pour éviter la dépendance CDN -->
+  <script src="/tailwind.cdn.js"></script>
+  <!-- Alpine.js v3 — servi localement pour éviter la dépendance CDN -->
+  <script defer src="/alpine.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Phosphor Icons — icônes modernes -->
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            dark:    { 900: '#0a0a0f', 800: '#111118', 700: '#1a1a24', 600: '#22222e', 500: '#2d2d3d' },
+            brand:   { DEFAULT: '#7c3aed', light: '#a78bfa', dark: '#5b21b6' },
+            accent:  { DEFAULT: '#06b6d4', light: '#67e8f9' },
+            success: '#10b981',
+            warn:    '#f59e0b',
+            danger:  '#ef4444',
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'slide-up':   'slideUp .3s ease-out',
+            'fade-in':    'fadeIn .25s ease-out',
+          },
+          keyframes: {
+            slideUp:  { '0%': { transform: 'translateY(12px)', opacity: 0 }, '100%': { transform: 'translateY(0)', opacity: 1 } },
+            fadeIn:   { '0%': { opacity: 0 }, '100%': { opacity: 1 } },
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ── Base ─────────────────────────────────────────────────────────── */
+    body { background: #0a0a0f; color: #e2e8f0; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #111118; }
+    ::-webkit-scrollbar-thumb { background: #3d2d6d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+
+    .glass { background: rgba(17,17,24,.85); backdrop-filter: blur(12px); border: 1px solid rgba(124,58,237,.15); }
+    .glow  { box-shadow: 0 0 24px rgba(124,58,237,.25); }
+    .drag-over { border-color: #7c3aed !important; background: rgba(124,58,237,.08) !important; }
+    .log-info    { color: #94a3b8; }
+    .log-success { color: #10b981; }
+    .log-warning { color: #f59e0b; }
+    .log-error   { color: #ef4444; }
+    .clip-card:hover .clip-overlay { opacity: 1; }
+    .clip-overlay { opacity: 0; transition: opacity .2s; }
+    [x-cloak] { display: none !important; }
+    .log-box { max-height: 220px; overflow-y: auto; }
+    .score-ring { stroke-dasharray: 100; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+
+    /* ── 1. Orbes flottants (fond aurora) ────────────────────────────── */
+    .bg-orb {
+      position: fixed; border-radius: 50%;
+      filter: blur(90px); pointer-events: none; z-index: 0;
+    }
+    .bg-orb-1 {
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(124,58,237,.18), transparent 70%);
+      top: -250px; left: -250px;
+      animation: orb1 22s ease-in-out infinite;
+    }
+    .bg-orb-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(6,182,212,.14), transparent 70%);
+      bottom: -150px; right: -150px;
+      animation: orb2 28s ease-in-out infinite;
+    }
+    .bg-orb-3 {
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(167,139,250,.10), transparent 70%);
+      top: 45%; left: 40%;
+      animation: orb3 35s ease-in-out infinite;
+    }
+    @keyframes orb1 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%      { transform: translate(70px, 90px) scale(1.15); }
+      66%      { transform: translate(-50px, 120px) scale(.9); }
+    }
+    @keyframes orb2 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      50%      { transform: translate(-120px, -90px) scale(1.2); }
+    }
+    @keyframes orb3 {
+      0%,100% { transform: translate(0,0) scale(1); }
+      30%      { transform: translate(110px, -60px) scale(.8); }
+      70%      { transform: translate(-70px, 90px) scale(1.15); }
+    }
+
+    /* ── 2. Logo texte shimmer ────────────────────────────────────────── */
+    .logo-brand {
+      background: linear-gradient(90deg, #fff 0%, #a78bfa 35%, #67e8f9 65%, #fff 100%);
+      background-size: 220% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: logo-shimmer 5s linear infinite;
+    }
+    @keyframes logo-shimmer { to { background-position: 220% center; } }
+
+    /* ── 3. Icône logo pulsante ───────────────────────────────────────── */
+    @keyframes glow-pulse {
+      0%,100% { box-shadow: 0 0 18px rgba(124,58,237,.35); }
+      50%      { box-shadow: 0 0 38px rgba(124,58,237,.6), 0 0 70px rgba(6,182,212,.15); }
+    }
+    .glow-animated { animation: glow-pulse 3s ease-in-out infinite; }
+
+    /* ── 4. Cards — hover lift ────────────────────────────────────────── */
+    .card-lift {
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+    }
+    .card-lift:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(124,58,237,.22);
+      border-color: rgba(124,58,237,.35) !important;
+    }
+
+    /* ── 5. Entrée en cascade ─────────────────────────────────────────── */
+    @keyframes cascade-in {
+      from { opacity: 0; transform: translateY(18px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);   }
+    }
+    .cascade > * { animation: cascade-in .38s cubic-bezier(.22,1,.36,1) both; }
+    .cascade > *:nth-child(1)  { animation-delay:  30ms; }
+    .cascade > *:nth-child(2)  { animation-delay:  90ms; }
+    .cascade > *:nth-child(3)  { animation-delay: 150ms; }
+    .cascade > *:nth-child(4)  { animation-delay: 210ms; }
+    .cascade > *:nth-child(5)  { animation-delay: 270ms; }
+    .cascade > *:nth-child(6)  { animation-delay: 330ms; }
+    .cascade > *:nth-child(7)  { animation-delay: 390ms; }
+
+    /* ── 6. Bouton shimmer ────────────────────────────────────────────── */
+    .btn-shimmer { position: relative; overflow: hidden; }
+    .btn-shimmer::after {
+      content: '';
+      position: absolute; top: 0; left: -100%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+      transform: skewX(-20deg);
+      transition: left 0s;
+    }
+    .btn-shimmer:hover::after { left: 160%; transition: left .5s ease; }
+
+    /* ── 7. Nav item — indicateur actif ──────────────────────────────── */
+    .nav-item-active {
+      position: relative;
+    }
+    .nav-item-active::before {
+      content: '';
+      position: absolute; left: -4px; top: 20%; height: 60%; width: 3px;
+      background: linear-gradient(to bottom, #7c3aed, #06b6d4);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 0 10px rgba(124,58,237,.7);
+    }
+
+    /* ── 8. Barre de progression avec reflet ─────────────────────────── */
+    .progress-bar { transition: width .5s cubic-bezier(.4,0,.2,1); }
+    .progress-shimmer { position: relative; overflow: hidden; }
+    .progress-shimmer::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 20%, rgba(255,255,255,.25) 50%, transparent 80%);
+      animation: progress-sweep 2s ease-in-out infinite;
+    }
+    @keyframes progress-sweep {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
+
+    /* ── 9. Toasts — entrée rebondissante ────────────────────────────── */
+    @keyframes toast-spring {
+      0%   { opacity: 0; transform: translateX(80px) scale(.8); }
+      60%  { transform: translateX(-6px) scale(1.02); }
+      80%  { transform: translateX(3px) scale(.99); }
+      100% { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes toast-out {
+      to { opacity: 0; transform: translateX(60px) scale(.9); }
+    }
+    .toast-item { animation: toast-spring .4s cubic-bezier(.22,1,.36,1) both; }
+
+    /* ── 10. Stat number pop ─────────────────────────────────────────── */
+    @keyframes stat-pop {
+      0%   { transform: scale(.6); opacity: 0; }
+      65%  { transform: scale(1.12); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .stat-pop { animation: stat-pop .45s cubic-bezier(.34,1.56,.64,1) both; }
+
+    /* ── 11. Gradient border au hover sur cards clés ─────────────────── */
+    .hover-border {
+      position: relative;
+    }
+    .hover-border::before {
+      content: ''; position: absolute; inset: -1px;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #7c3aed, #06b6d4, #a78bfa, #7c3aed);
+      background-size: 300%;
+      opacity: 0;
+      transition: opacity .3s;
+      z-index: -1;
+      animation: gb-sweep 4s linear infinite paused;
+    }
+    .hover-border:hover::before {
+      opacity: .5;
+      animation-play-state: running;
+    }
+    @keyframes gb-sweep { to { background-position: 300% center; } }
+
+    /* ── 12. Scan line (traitement en cours) ─────────────────────────── */
+    @keyframes scan-line {
+      0%   { top: -4px; opacity: .8; }
+      100% { top: 100%; opacity: 0; }
+    }
+    .scan-wrap { position: relative; overflow: hidden; }
+    .scan-wrap::after {
+      content: ''; position: absolute; left: 0; width: 100%; height: 2px;
+      background: linear-gradient(90deg, transparent, #7c3aed, #06b6d4, transparent);
+      box-shadow: 0 0 8px #7c3aed;
+      animation: scan-line 2.5s ease-in-out infinite;
+    }
+
+    /* ── 13. Chat input focus glow ───────────────────────────────────── */
+    .cmd-input:focus {
+      box-shadow: 0 0 0 2px rgba(124,58,237,.45), 0 0 20px rgba(124,58,237,.15);
+    }
+
+    /* ── 14. Clip card hover scale ───────────────────────────────────── */
+    .clip-card {
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .clip-card:hover {
+      transform: scale(1.02);
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+
+    /* ── 15. Animated gradient text helper ───────────────────────────── */
+    .gradient-text {
+      background: linear-gradient(90deg, #a78bfa, #67e8f9, #a78bfa);
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: logo-shimmer 4s linear infinite;
+    }
+
+    /* ── Tailwind animation overrides ────────────────────────────────── */
+    .animate-slide-up  { animation: slideUp .3s ease-out; }
+    .animate-fade-in   { animation: fadeIn .3s ease-out; }
+    @keyframes slideUp { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ══════════════════════════════════════════════════════════════════
+       OPUS CLIP INSPIRED ANIMATIONS
+    ══════════════════════════════════════════════════════════════════ */
+
+    /* ── A. Texture de bruit subtile (Opus Clip signature) ───────────── */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      opacity: .4;
+    }
+
+    /* ── B. Skeleton shimmer ─────────────────────────────────────────── */
+    @keyframes skel-wave {
+      0%   { background-position: -400px 0; }
+      100% { background-position: 400px 0;  }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #1a1a24 25%, #26263a 50%, #1a1a24 75%);
+      background-size: 800px 100%;
+      animation: skel-wave 1.6s ease-in-out infinite;
+      border-radius: 8px;
+    }
+    .skeleton-card {
+      background: rgba(17,17,24,.85);
+      border: 1px solid rgba(124,58,237,.1);
+      border-radius: 12px;
+      overflow: hidden;
+      animation: cascade-in .38s cubic-bezier(.22,1,.36,1) both;
+    }
+
+    /* ── C. Upload zone — bordure marching-ants + glow ───────────────── */
+    .upload-zone-anim {
+      position: relative;
+      border: 2px dashed rgba(124,58,237,.35) !important;
+      transition: border-color .3s, box-shadow .3s;
+      animation: upload-border-pulse 3s ease-in-out infinite;
+    }
+    .upload-zone-anim:hover {
+      border-color: rgba(124,58,237,.85) !important;
+      box-shadow: 0 0 30px rgba(124,58,237,.12), inset 0 0 30px rgba(124,58,237,.04) !important;
+      animation: none;
+    }
+    @keyframes upload-border-pulse {
+      0%,100% { border-color: rgba(124,58,237,.3); box-shadow: none; }
+      50%      { border-color: rgba(124,58,237,.6); box-shadow: 0 0 18px rgba(124,58,237,.1); }
+    }
+    /* Icône qui rebondit légèrement */
+    .upload-icon-bounce {
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    .upload-zone-anim:hover .upload-icon-bounce {
+      transform: translateY(-6px) scale(1.12);
+    }
+    /* Drag-over amplifié */
+    .upload-zone-anim.drag-over {
+      border-color: #7c3aed !important;
+      background: rgba(124,58,237,.08) !important;
+      box-shadow: 0 0 40px rgba(124,58,237,.2) !important;
+      animation: drag-pulse .7s ease-in-out infinite alternate !important;
+    }
+    @keyframes drag-pulse {
+      from { box-shadow: 0 0 20px rgba(124,58,237,.2); }
+      to   { box-shadow: 0 0 50px rgba(124,58,237,.4); }
+    }
+
+    /* ── D. Waveform IA ──────────────────────────────────────────────── */
+    .waveform {
+      display: flex; align-items: center; gap: 3px; height: 36px;
+    }
+    .waveform-bar {
+      width: 3px; border-radius: 99px;
+      background: linear-gradient(to top, #7c3aed, #06b6d4);
+      animation: wv 1.3s ease-in-out infinite;
+      transform-origin: bottom;
+    }
+    .waveform-bar:nth-child(1){ animation-delay:   0ms; height: 40%; }
+    .waveform-bar:nth-child(2){ animation-delay: 110ms; height: 75%; }
+    .waveform-bar:nth-child(3){ animation-delay: 220ms; height:100%; }
+    .waveform-bar:nth-child(4){ animation-delay: 330ms; height: 55%; }
+    .waveform-bar:nth-child(5){ animation-delay: 440ms; height: 85%; }
+    .waveform-bar:nth-child(6){ animation-delay: 550ms; height: 45%; }
+    .waveform-bar:nth-child(7){ animation-delay: 660ms; height: 95%; }
+    .waveform-bar:nth-child(8){ animation-delay: 770ms; height: 35%; }
+    @keyframes wv {
+      0%,100% { transform: scaleY(.2); opacity: .45; }
+      50%      { transform: scaleY(1);  opacity: 1;   }
+    }
+
+    /* ── E. Clip card — Opus-style reveal depuis le bas ─────────────── */
+    .clip-thumb { overflow: hidden; }
+    .clip-thumb img {
+      transition: transform .45s cubic-bezier(.22,1,.36,1);
+    }
+    .clip-card:hover .clip-thumb img { transform: scale(1.08); }
+
+    .clip-reveal {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      transform: translateY(101%);
+      transition: transform .32s cubic-bezier(.22,1,.36,1);
+      background: linear-gradient(to top, rgba(10,10,15,.96) 60%, transparent);
+      padding: 1rem;
+    }
+    .clip-card:hover .clip-reveal { transform: translateY(0); }
+
+    /* Score badge gradient ring */
+    .score-badge {
+      position: relative; display: inline-flex;
+      align-items: center; justify-content: center;
+    }
+    .score-badge-ring {
+      position: absolute; inset: -3px;
+      border-radius: 50%;
+      background: conic-gradient(#7c3aed var(--score-deg, 270deg), transparent 0);
+      filter: blur(1px);
+      opacity: .7;
+    }
+
+    /* ── F. Empty state — flottement + anneau pulsant ────────────────── */
+    @keyframes float {
+      0%,100% { transform: translateY(0) rotate(-3deg); }
+      50%      { transform: translateY(-14px) rotate(3deg); }
+    }
+    .empty-float { animation: float 4s ease-in-out infinite; }
+
+    @keyframes ring-expand {
+      0%   { transform: scale(.85); opacity: .6; }
+      100% { transform: scale(1.6);  opacity: 0;  }
+    }
+    .empty-ring-wrap {
+      position: relative; display: inline-flex;
+      align-items: center; justify-content: center;
+    }
+    .empty-ring-wrap::before,
+    .empty-ring-wrap::after {
+      content: '';
+      position: absolute; inset: -8px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(124,58,237,.35);
+      animation: ring-expand 2.8s ease-out infinite;
+    }
+    .empty-ring-wrap::after { animation-delay: 1.4s; }
+
+    /* ── G. Sliding nav pill (Opus Clip sidebar style) ───────────────── */
+    #nav-pill {
+      position: absolute;
+      left: 0; right: 0;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(124,58,237,.18);
+      border: 1px solid rgba(124,58,237,.28);
+      transition: top .3s cubic-bezier(.22,1,.36,1), opacity .2s;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── H. Transitions de vue fluides ───────────────────────────────── */
+    .view-transition {
+      animation: view-in .3s cubic-bezier(.22,1,.36,1) both;
+    }
+    @keyframes view-in {
+      from { opacity: 0; transform: translateY(12px) scale(.99); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ── I. Particles flottantes sur la page login ───────────────────── */
+    @keyframes particle-float {
+      0%   { transform: translateY(0) translateX(0) scale(1); opacity: .6; }
+      33%  { transform: translateY(-30px) translateX(15px) scale(1.2); opacity: .3; }
+      66%  { transform: translateY(-15px) translateX(-10px) scale(.8); opacity: .5; }
+      100% { transform: translateY(0) translateX(0) scale(1); opacity: .6; }
+    }
+    .login-particle {
+      position: absolute; border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,58,237,.6), transparent);
+      filter: blur(2px);
+      animation: particle-float linear infinite;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body class="font-sans min-h-screen flex overflow-x-hidden">
+
+<!-- Orbes aurora flottants -->
+<div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+<div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+<div class="bg-orb bg-orb-3" aria-hidden="true"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SIDEBAR OVERLAY (mobile seulement)
+══════════════════════════════════════════════════════════════ -->
+<div x-show="sidebarOpen && authToken"
+     @click="sidebarOpen = false"
+     x-transition:enter="transition-opacity ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition-opacity ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="fixed inset-0 z-40 bg-black/60 md:hidden"
+     x-cloak>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════════════════ -->
+<aside
+  x-show="authToken"
+  :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
+  class="fixed md:relative inset-y-0 left-0 z-50 w-64 min-h-screen glass flex flex-col border-r border-dark-600 flex-shrink-0 transition-transform duration-200 ease-out">
+
+  <!-- Logo -->
+  <div class="p-5 border-b border-dark-600">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand to-accent flex items-center justify-center glow-animated">
+        <i class="ph-bold ph-scissors text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="font-black text-base tracking-tight logo-brand">ClipAI</div>
+        <div class="text-xs text-slate-500 font-medium">Générateur de clips</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <nav id="sidebar-nav" class="flex-1 p-4 flex flex-col relative">
+    <!-- Pill glissante style Opus Clip -->
+    <div id="nav-pill" style="top:0; opacity:0;"></div>
+
+    <!-- Items principaux -->
+    <div class="space-y-1 flex-1">
+      <template x-for="item in navItemsBase" :key="item.id">
+        <button
+          :data-view="item.id"
+          @click="
+            currentView = item.id;
+            sidebarOpen = false;
+            $nextTick(() => updateNavPill());
+          "
+          :class="currentView === item.id
+            ? 'text-brand-light'
+            : 'text-slate-400 hover:text-white'"
+          class="relative z-10 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200">
+          <span x-html="item.icon" class="w-4 h-4 flex-shrink-0"></span>
+          <span x-text="item.label"></span>
+          <span x-show="item.id === 'clips' && stats.total_clips"
+            class="ml-auto bg-brand/30 text-brand-light text-xs px-1.5 py-0.5 rounded-full"
+            x-text="stats.total_clips">
+          </span>
+        </button>
+      </template>
+    </div>
+
+    <!-- Séparateur + Panel Admin (admins uniquement, épinglé en bas) -->
+    <template x-if="userRole === 'admin'">
+      <div class="mt-3 pt-3 border-t border-dark-600 space-y-1">
+        <div class="text-xs text-slate-600 font-semibold uppercase tracking-widest px-3 mb-1">Administration</div>
+        <button
+          data-view="admin"
+          @click="
+            currentView = 'admin';
+            sidebarOpen = false;
+            loadAdminData();
+            $nextTick(() => updateNavPill());
+          "
+          :class="currentView === 'admin'
+            ? 'bg-brand/15 text-brand-light border border-brand/25'
+            : 'text-slate-400 hover:text-white hover:bg-dark-600/60 border border-transparent'"
+          class="relative z-10 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200">
+          <i class="ph-bold ph-shield-check text-base flex-shrink-0"></i>
+          <span>Panel Admin</span>
+          <!-- Pastille nombre d'utilisateurs en ligne -->
+          <span x-show="adminStats.online_users > 0"
+            class="ml-auto flex items-center gap-1 bg-success/20 text-success text-xs px-1.5 py-0.5 rounded-full font-medium">
+            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block"></span>
+            <span x-text="adminStats.online_users"></span>
+          </span>
+        </button>
+      </div>
+    </template>
+  </nav>
+
+  <!-- Quota / Stats rapides -->
+  <div class="p-4 border-t border-dark-600 space-y-3">
+    <div class="text-xs text-slate-500 font-medium uppercase tracking-wider">Ce mois</div>
+    <div class="space-y-2">
+      <div class="flex justify-between text-xs">
+        <span class="text-slate-400">Vidéos traitées</span>
+        <span class="text-white font-semibold" x-text="stats.videos_done || 0"></span>
+      </div>
+      <div class="flex justify-between text-xs">
+        <span class="text-slate-400">Clips générés</span>
+        <span class="text-white font-semibold" x-text="stats.total_clips || 0"></span>
+      </div>
+      <div class="flex justify-between text-xs">
+        <span class="text-slate-400">Score moyen</span>
+        <span class="text-brand-light font-semibold" x-text="stats.avg_score ? (stats.avg_score * 100).toFixed(0) + '%' : '--'"></span>
+      </div>
+    </div>
+
+    <!-- TikTok connexion -->
+    <div x-show="authToken" class="pt-2 border-t border-dark-600">
+      <div class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-2">TikTok</div>
+
+      <!-- Connecté -->
+      <div x-show="tiktokConnected" class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-success flex-shrink-0"></span>
+          <span class="text-xs text-success font-medium">Connecté</span>
+        </div>
+        <div class="text-xs text-slate-500 truncate" x-text="tiktokOpenId ? 'ID : ' + tiktokOpenId.slice(0,12) + '…' : ''"></div>
+        <button @click="disconnectTikTok()"
+          class="text-xs text-slate-400 hover:text-danger transition-colors">
+          Déconnecter
+        </button>
+      </div>
+
+      <!-- Non connecté -->
+      <div x-show="!tiktokConnected">
+        <button @click="connectTikTok()" :disabled="tiktokLoading"
+          class="w-full flex items-center justify-center gap-2 bg-[#010101] hover:bg-[#1a1a1a] border border-[#333] text-white text-xs font-medium py-2 px-3 rounded-lg transition-colors disabled:opacity-50">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/>
+          </svg>
+          <span x-text="tiktokLoading ? 'Connexion…' : 'Connecter TikTok'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Auth info -->
+    <div x-show="authToken" class="pt-2 border-t border-dark-600">
+      <div class="flex items-center gap-2">
+        <div class="text-xs text-slate-500 truncate flex-1" x-text="userEmail || 'Connecté'"></div>
+        <span x-show="userRole === 'admin'"
+          class="text-xs bg-brand/25 text-brand-light border border-brand/30 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+          Admin
+        </span>
+      </div>
+      <button @click="logout()" class="mt-1 text-xs text-danger hover:text-red-300 transition-colors">
+        Déconnexion
+      </button>
+    </div>
+  </div>
+</aside>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════ -->
+<main class="flex-1 flex flex-col min-h-screen overflow-y-auto w-full min-w-0">
+
+  <!-- Top Bar -->
+  <header x-show="authToken" class="h-16 glass border-b border-dark-600 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+    <div class="flex items-center gap-3">
+      <!-- Bouton hamburger (mobile uniquement) -->
+      <button @click="sidebarOpen = !sidebarOpen"
+        class="md:hidden flex items-center justify-center w-9 h-9 rounded-lg text-slate-400 hover:text-white hover:bg-dark-600 transition-colors flex-shrink-0">
+        <i class="ph-bold ph-list text-xl"></i>
+      </button>
+      <h1 class="font-semibold text-white text-sm md:text-base truncate" x-text="viewTitle"></h1>
+    </div>
+    <div class="flex items-center gap-2 md:gap-3">
+      <!-- Indicateur processing -->
+      <div x-show="processingCount > 0" class="flex items-center gap-2 bg-brand/15 border border-brand/30 rounded-full px-2.5 md:px-3 py-1 text-xs text-brand-light">
+        <span class="w-1.5 h-1.5 rounded-full bg-brand-light animate-pulse"></span>
+        <span x-text="processingCount + ' en cours'"></span>
+      </div>
+
+      <!-- Bouton "Nouvelle vidéo" — masqué sur la vue admin (FAB flottant à la place) -->
+      <button x-show="currentView !== 'admin'"
+        @click="currentView = 'upload'; sidebarOpen = false"
+        class="btn-shimmer flex items-center gap-1.5 md:gap-2 bg-brand hover:bg-brand-dark text-white text-xs md:text-sm font-medium px-3 md:px-4 py-2 rounded-lg transition-colors glow flex-shrink-0">
+        <i class="ph-bold ph-plus text-base"></i>
+        <span class="hidden sm:inline">Nouvelle vidéo</span>
+        <span class="sm:hidden">Nouveau</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Scrollable content -->
+  <div class="flex-1 overflow-y-auto p-4 md:p-6">
+    <div class="max-w-7xl mx-auto w-full">
+
+    <!-- ── LOGIN / REGISTER ─────────────────────────────────────────────── -->
+    <div x-show="!authToken" x-cloak class="relative flex items-center justify-center min-h-screen py-8 overflow-hidden">
+
+      <!-- Particules flottantes décoratives -->
+      <div class="login-particle" style="width:8px;height:8px;  top:15%;left:12%; animation-duration:7s;  animation-delay:0s"></div>
+      <div class="login-particle" style="width:5px;height:5px;  top:70%;left:8%;  animation-duration:9s;  animation-delay:2s"></div>
+      <div class="login-particle" style="width:10px;height:10px;top:30%;left:85%; animation-duration:11s; animation-delay:1s"></div>
+      <div class="login-particle" style="width:6px;height:6px;  top:80%;left:80%; animation-duration:8s;  animation-delay:3s"></div>
+      <div class="login-particle" style="width:4px;height:4px;  top:50%;left:5%;  animation-duration:13s; animation-delay:0.5s"></div>
+      <div class="login-particle" style="width:7px;height:7px;  top:20%;left:70%; animation-duration:10s; animation-delay:4s"></div>
+
+      <div class="glass rounded-2xl p-8 w-full max-w-sm glow animate-slide-up relative z-10">
+
+        <!-- Logo -->
+        <div class="text-center mb-6">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-accent mx-auto flex items-center justify-center glow-animated mb-4">
+            <i class="ph-bold ph-scissors text-white text-3xl"></i>
+          </div>
+          <h2 class="text-xl font-bold gradient-text"
+            x-text="authMode === 'verify_pending' ? 'Vérifiez votre email'
+                   : authMode === 'login'         ? 'Connexion à ClipAI'
+                   : 'Créer un compte'">
+          </h2>
+          <p class="text-slate-400 text-sm mt-1">Générez vos clips viraux en un clic</p>
+        </div>
+
+        <!-- ── Écran "Email envoyé — vérifiez votre boîte" ── -->
+        <div x-show="authMode === 'verify_pending'" class="space-y-4 text-center">
+          <div class="w-16 h-16 rounded-full bg-brand/20 mx-auto flex items-center justify-center">
+            <i class="ph-bold ph-envelope text-brand-light text-3xl"></i>
+          </div>
+          <p class="text-slate-300 text-sm leading-relaxed">
+            Un email de confirmation a été envoyé à<br>
+            <span class="text-white font-semibold" x-text="registerEmail"></span>
+          </p>
+          <p class="text-slate-500 text-xs">Cliquez sur le lien dans l'email pour activer votre compte. Vérifiez aussi vos spams.</p>
+
+          <!-- Renvoi email -->
+          <button @click="resendVerification()" :disabled="resendLoading"
+            class="w-full flex items-center justify-center gap-2 bg-dark-600 hover:bg-dark-500 border border-dark-500 text-slate-300 text-sm py-2.5 rounded-lg transition-colors disabled:opacity-50">
+            <i class="ph-bold ph-paper-plane-tilt text-base"></i>
+            <span x-text="resendLoading ? 'Envoi…' : 'Renvoyer l\'email'"></span>
+          </button>
+          <button @click="authMode = 'login'" class="text-xs text-brand-light hover:text-white transition-colors">
+            ← Retour à la connexion
+          </button>
+        </div>
+
+        <!-- Toggle connexion / inscription -->
+        <div x-show="authMode !== 'verify_pending'" class="flex gap-1 bg-dark-700 rounded-xl p-1 mb-6">
+          <button @click="authMode = 'login'; loginError = ''; registerError = ''"
+            :class="authMode === 'login' ? 'bg-brand text-white shadow' : 'text-slate-400 hover:text-white'"
+            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all">
+            <i class="ph-bold ph-sign-in mr-1"></i> Connexion
+          </button>
+          <button @click="authMode = 'register'; loginError = ''; registerError = ''"
+            :class="authMode === 'register' ? 'bg-brand text-white shadow' : 'text-slate-400 hover:text-white'"
+            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all">
+            <i class="ph-bold ph-user-plus mr-1"></i> Inscription
+          </button>
+        </div>
+
+        <!-- ── Formulaire Connexion ── -->
+        <form x-show="authMode === 'login'" @submit.prevent="login()" class="space-y-4">
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Email</label>
+            <input x-model="loginEmail" type="email" required
+              class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+              placeholder="vous@exemple.com" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Mot de passe</label>
+            <input x-model="loginPassword" type="password" required
+              class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+              placeholder="••••••••" />
+          </div>
+
+          <!-- Erreur normale -->
+          <div x-show="loginError && loginError !== 'email_not_verified'"
+            class="text-danger text-xs p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg"
+            x-text="loginError">
+          </div>
+
+          <!-- Erreur email non vérifié — avec bouton renvoi -->
+          <div x-show="loginError === 'email_not_verified'"
+            class="p-3 bg-warn/10 border border-warn/30 rounded-lg space-y-2">
+            <p class="text-warn text-xs flex items-center gap-1.5">
+              <i class="ph-bold ph-envelope-simple text-base flex-shrink-0"></i>
+              Email non confirmé. Vérifiez votre boîte mail.
+            </p>
+            <button type="button" @click="registerEmail = loginEmail; resendVerification()"
+              class="text-xs text-brand-light hover:text-white transition-colors underline">
+              Renvoyer l'email de confirmation →
+            </button>
+          </div>
+
+          <button type="submit" :disabled="loginLoading"
+            class="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-medium py-2.5 rounded-lg transition-colors glow disabled:opacity-50">
+            <i x-show="!loginLoading" class="ph-bold ph-sign-in text-base"></i>
+            <i x-show="loginLoading" class="ph-bold ph-arrows-clockwise text-base animate-spin"></i>
+            <span x-text="loginLoading ? 'Connexion…' : 'Se connecter'"></span>
+          </button>
+          <p class="text-center text-xs text-slate-500">
+            Pas encore de compte ?
+            <button type="button" @click="authMode = 'register'" class="text-brand-light hover:text-white transition-colors">S'inscrire →</button>
+          </p>
+        </form>
+
+        <!-- ── Formulaire Inscription ── -->
+        <form x-show="authMode === 'register'" @submit.prevent="register()" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Prénom</label>
+              <input x-model="registerFirstName" type="text" required
+                class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+                placeholder="Jean" />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Nom</label>
+              <input x-model="registerLastName" type="text" required
+                class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+                placeholder="Dupont" />
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Email</label>
+            <input x-model="registerEmail" type="email" required
+              class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+              placeholder="vous@exemple.com" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Mot de passe</label>
+            <input x-model="registerPassword" type="password" required minlength="8"
+              class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+              placeholder="8 caractères minimum" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide">Confirmer le mot de passe</label>
+            <input x-model="registerPasswordConfirm" type="password" required
+              class="mt-1 w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-brand transition-colors"
+              placeholder="••••••••" />
+          </div>
+          <div x-show="registerError" class="text-danger text-xs p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg" x-text="registerError"></div>
+          <button type="submit" :disabled="registerLoading"
+            class="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-medium py-2.5 rounded-lg transition-colors glow disabled:opacity-50">
+            <i x-show="!registerLoading" class="ph-bold ph-user-plus text-base"></i>
+            <i x-show="registerLoading" class="ph-bold ph-arrows-clockwise text-base animate-spin"></i>
+            <span x-text="registerLoading ? 'Création…' : 'Créer mon compte'"></span>
+          </button>
+          <p class="text-center text-xs text-slate-500">
+            Déjà un compte ?
+            <button type="button" @click="authMode = 'login'" class="text-brand-light hover:text-white transition-colors">Se connecter →</button>
+          </p>
+        </form>
+
+      </div><!-- /glass card -->
+    </div><!-- /login wrapper -->
+
+
+    <!-- ── DASHBOARD ───────────────────────────────────────────────────── -->
+    <div x-show="authToken && currentView === 'dashboard'" class="space-y-6 animate-fade-in">
+
+      <!-- Stat cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 cascade">
+        <template x-for="card in statCards" :key="card.label">
+          <div class="glass rounded-xl p-5 card-lift hover-border cursor-default">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-slate-400 text-xs font-medium" x-text="card.label"></span>
+              <span x-html="card.icon" class="text-brand-light opacity-80"></span>
+            </div>
+            <div class="text-2xl font-bold text-white stat-pop"
+              x-text="card.value"
+              :data-count="typeof card.raw === 'number' ? card.raw : null">
+            </div>
+            <div class="text-xs text-slate-500 mt-1" x-text="card.sub"></div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Commande IA + vidéos récentes -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        <!-- Commande IA (3/5) -->
+        <div class="lg:col-span-3 glass rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+            <h3 class="font-semibold text-white text-sm">Assistant IA</h3>
+          </div>
+
+          <!-- Historique chat -->
+          <div class="space-y-3 mb-4 max-h-72 overflow-y-auto pr-1" x-ref="chatHistory">
+            <template x-for="(msg, idx) in chatHistory" :key="idx">
+              <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                <div :class="msg.role === 'user'
+                    ? 'bg-brand/25 border border-brand/30 text-slate-200 rounded-2xl rounded-tr-sm'
+                    : 'bg-dark-600 border border-dark-500 text-slate-300 rounded-2xl rounded-tl-sm'"
+                  class="max-w-xs lg:max-w-sm px-4 py-2.5 text-sm"
+                  x-html="formatMessage(msg.content)">
+                </div>
+              </div>
+            </template>
+            <div x-show="cmdLoading" class="flex justify-start">
+              <div class="bg-dark-600 border border-dark-500 rounded-2xl rounded-tl-sm px-4 py-3">
+                <div class="flex gap-1">
+                  <span class="w-1.5 h-1.5 bg-brand-light rounded-full animate-bounce" style="animation-delay:0ms"></span>
+                  <span class="w-1.5 h-1.5 bg-brand-light rounded-full animate-bounce" style="animation-delay:150ms"></span>
+                  <span class="w-1.5 h-1.5 bg-brand-light rounded-full animate-bounce" style="animation-delay:300ms"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggestions rapides -->
+          <div x-show="chatHistory.length === 0" class="flex flex-wrap gap-2 mb-3">
+            <template x-for="s in suggestions" :key="s">
+              <button @click="commandInput = s; sendCommand()"
+                class="text-xs bg-dark-600 hover:bg-dark-500 border border-dark-500 hover:border-brand/40 text-slate-300 hover:text-white px-3 py-1.5 rounded-full transition-all">
+                <span x-text="s"></span>
+              </button>
+            </template>
+          </div>
+
+          <!-- Input commande -->
+          <div class="flex gap-2">
+            <input x-model="commandInput"
+              @keydown.enter="sendCommand()"
+              :disabled="cmdLoading"
+              class="cmd-input flex-1 bg-dark-700 border border-dark-500 focus:border-brand rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
+              placeholder="Génère 5 clips TikTok de ma dernière vidéo…" />
+            <button @click="sendCommand()" :disabled="cmdLoading || !commandInput.trim()"
+              class="bg-brand hover:bg-brand-dark text-white px-4 py-2.5 rounded-xl transition-colors glow disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">
+              <i class="ph-bold ph-paper-plane-tilt text-base"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Vidéos récentes (2/5) -->
+        <div class="lg:col-span-2 glass rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white text-sm">Vidéos récentes</h3>
+            <button @click="currentView = 'videos'" class="text-xs text-brand-light hover:text-white transition-colors">Voir tout →</button>
+          </div>
+
+          <div x-show="videos.length === 0" class="text-center py-10 text-slate-500">
+            <div class="empty-ring-wrap inline-block mb-3">
+              <i class="ph-bold ph-film-strip text-4xl text-brand/30 empty-float block"></i>
+            </div>
+            <p class="text-xs text-slate-600 mt-2">Aucune vidéo importée</p>
+          </div>
+
+          <div class="space-y-3">
+            <template x-for="v in videos.slice(0,4)" :key="v.id">
+              <div @click="selectVideo(v); currentView = 'processing'"
+                class="flex items-center gap-3 p-2.5 rounded-lg hover:bg-dark-600 cursor-pointer transition-colors group">
+                <!-- Icône statut -->
+                <div :class="{
+                    'bg-success/20 text-success': v.status === 'done',
+                    'bg-brand/20 text-brand-light animate-pulse': ['extracting','analyzing','generating'].includes(v.status),
+                    'bg-danger/20 text-danger': v.status === 'failed',
+                    'bg-slate-700 text-slate-400': v.status === 'uploaded',
+                  }" class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs">
+                  <template x-if="v.status === 'done'">
+                    <i class="ph-bold ph-check text-sm"></i>
+                  </template>
+                  <template x-if="['extracting','analyzing','generating'].includes(v.status)">
+                    <i class="ph-bold ph-arrows-clockwise text-sm animate-spin"></i>
+                  </template>
+                  <template x-if="v.status === 'failed'">
+                    <i class="ph-bold ph-x text-sm"></i>
+                  </template>
+                  <template x-if="v.status === 'uploaded'">
+                    <i class="ph-bold ph-clock text-sm"></i>
+                  </template>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm text-white truncate group-hover:text-brand-light transition-colors" x-text="v.title"></div>
+                  <div class="text-xs text-slate-500 mt-0.5">
+                    <span x-text="v.duration_fmt"></span>
+                    <span x-show="v.clips_count"> · <span x-text="v.clips_count"></span> clips</span>
+                    <span x-show="['extracting','analyzing','generating'].includes(v.status)">
+                      · <span x-text="v.progress + '%'"></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ── UPLOAD ───────────────────────────────────────────────────────── -->
+    <div x-show="authToken && currentView === 'upload'" class="max-w-2xl mx-auto space-y-6 animate-fade-in">
+      <div class="glass rounded-2xl p-8">
+        <h2 class="text-xl font-bold text-white mb-1">Importer une vidéo</h2>
+        <p class="text-slate-400 text-sm mb-6">Uploadez votre fichier ou fournissez un lien vers un contenu dont vous détenez les droits.</p>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 bg-dark-700 rounded-xl p-1 mb-6">
+          <button @click="uploadMode = 'file'"
+            :class="uploadMode === 'file' ? 'bg-brand text-white shadow' : 'text-slate-400 hover:text-white'"
+            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all">Fichier</button>
+          <button @click="uploadMode = 'url'"
+            :class="uploadMode === 'url' ? 'bg-brand text-white shadow' : 'text-slate-400 hover:text-white'"
+            class="flex-1 py-2 rounded-lg text-sm font-medium transition-all">Lien URL</button>
+        </div>
+
+        <!-- File drop zone -->
+        <div x-show="uploadMode === 'file'"
+          @dragover.prevent="dragOver = true"
+          @dragleave="dragOver = false"
+          @drop.prevent="handleDrop($event)"
+          :class="dragOver ? 'drag-over' : ''"
+          class="upload-zone-anim rounded-xl p-10 text-center cursor-pointer mb-4"
+          @click="$refs.fileInput.click()">
+          <input x-ref="fileInput" type="file" class="hidden"
+            accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,.mkv"
+            @change="handleFileSelect($event)" />
+
+          <div x-show="!uploadFile">
+            <div class="upload-icon-bounce w-16 h-16 rounded-2xl bg-gradient-to-br from-brand/30 to-accent/20 mx-auto flex items-center justify-center mb-4 glow">
+              <i class="ph-bold ph-cloud-arrow-up text-3xl text-brand-light"></i>
+            </div>
+            <p class="text-white font-semibold text-base mb-1">Glissez votre vidéo ici</p>
+            <p class="text-slate-500 text-xs">MP4, MOV, AVI, MKV, WebM — max 5 GB</p>
+            <p class="text-brand-light/60 text-xs mt-3 font-medium">ou cliquez pour parcourir</p>
+          </div>
+
+          <div x-show="uploadFile" class="flex items-center gap-3 justify-center">
+            <div class="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center flex-shrink-0">
+              <i class="ph-bold ph-file-video text-success text-xl"></i>
+            </div>
+            <div class="text-left">
+              <p class="text-white text-sm font-medium" x-text="uploadFile?.name"></p>
+              <p class="text-slate-400 text-xs" x-text="uploadFile ? (uploadFile.size / 1024 / 1024).toFixed(1) + ' MB' : ''"></p>
+            </div>
+            <button @click.stop="uploadFile = null" class="text-slate-500 hover:text-danger transition-colors p-1">
+              <i class="ph-bold ph-x text-base"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- URL input -->
+        <div x-show="uploadMode === 'url'" class="mb-4">
+          <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">URL de la vidéo</label>
+          <input x-model="uploadUrl" type="url"
+            class="w-full bg-dark-700 border border-dark-500 focus:border-brand rounded-xl px-4 py-2.5 text-white text-sm outline-none transition-colors"
+            placeholder="https://exemple.com/ma-video.mp4" />
+          <p class="text-xs text-slate-500 mt-1.5">⚠️ Uniquement pour du contenu dont vous détenez les droits.</p>
+        </div>
+
+        <!-- Titre -->
+        <div class="mb-4">
+          <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">Titre du projet</label>
+          <input x-model="uploadTitle" type="text"
+            class="w-full bg-dark-700 border border-dark-500 focus:border-brand rounded-xl px-4 py-2.5 text-white text-sm outline-none transition-colors"
+            placeholder="Mon webinaire — Janvier 2025" />
+        </div>
+
+        <!-- Options -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">Plateforme cible</label>
+            <select x-model="uploadPlatform"
+              class="w-full bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-brand transition-colors">
+              <option value="all">Toutes plateformes</option>
+              <option value="tiktok">TikTok</option>
+              <option value="reels">Instagram Reels</option>
+              <option value="shorts">YouTube Shorts</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">Nombre de clips</label>
+            <input x-model.number="uploadClipCount" type="number" min="1" max="20"
+              class="w-full bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-brand transition-colors" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">Durée min (s)</label>
+            <input x-model.number="uploadMinDur" type="number" min="5" max="120"
+              class="w-full bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-brand transition-colors" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1.5 block">Durée max (s)</label>
+            <input x-model.number="uploadMaxDur" type="number" min="10" max="180"
+              class="w-full bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-brand transition-colors" />
+          </div>
+        </div>
+
+        <!-- Erreur upload -->
+        <div x-show="uploadError" class="mb-4 text-danger text-xs p-3 bg-red-500/10 rounded-xl" x-text="uploadError"></div>
+
+        <!-- Progress upload -->
+        <div x-show="uploadProgress > 0 && uploadProgress < 100" class="mb-4">
+          <div class="flex justify-between text-xs text-slate-400 mb-1">
+            <span>Upload en cours…</span>
+            <span x-text="uploadProgress + '%'"></span>
+          </div>
+          <div class="bg-dark-600 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-gradient-to-r from-brand to-accent h-1.5 rounded-full progress-bar progress-shimmer" :style="'width:' + uploadProgress + '%'"></div>
+          </div>
+        </div>
+
+        <button @click="submitUpload()"
+          :disabled="uploadLoading || (!uploadFile && !uploadUrl)"
+          class="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition-colors glow disabled:opacity-40 disabled:cursor-not-allowed">
+          <template x-if="!uploadLoading">
+            <span class="flex items-center gap-2"><i class="ph-bold ph-rocket-launch text-base"></i> Lancer l'analyse</span>
+          </template>
+          <template x-if="uploadLoading">
+            <span class="flex items-center gap-2"><i class="ph-bold ph-arrows-clockwise text-base animate-spin"></i> Envoi en cours…</span>
+          </template>
+        </button>
+      </div>
+
+      <!-- Terms -->
+      <div class="glass rounded-xl p-4 flex gap-3">
+        <i class="ph-bold ph-warning text-warn text-xl flex-shrink-0 mt-0.5"></i>
+        <p class="text-xs text-slate-400">En uploadant, vous certifiez être l'auteur ou détenir une licence sur ce contenu. Les vidéos sont supprimées automatiquement après 30 jours.</p>
+      </div>
+    </div>
+
+
+    <!-- ── VIDÉOS ───────────────────────────────────────────────────────── -->
+    <div x-show="authToken && currentView === 'videos'" class="space-y-4 animate-fade-in">
+
+      <!-- Skeleton loaders pendant le chargement -->
+      <div x-show="videosLoading" class="space-y-3 cascade">
+        <template x-for="n in [1,2,3,4]" :key="n">
+          <div class="skeleton-card p-4 flex items-center gap-4">
+            <div class="skeleton w-10 h-10 rounded-lg flex-shrink-0"></div>
+            <div class="flex-1 space-y-2">
+              <div class="skeleton h-3 rounded w-3/4"></div>
+              <div class="skeleton h-2.5 rounded w-1/2"></div>
+            </div>
+            <div class="skeleton h-6 w-20 rounded-full flex-shrink-0"></div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Empty state animé -->
+      <div x-show="!videosLoading && videos.length === 0" class="text-center py-20">
+        <div class="empty-ring-wrap inline-block mb-5">
+          <i class="ph-bold ph-video-camera text-5xl text-brand/35 empty-float block"></i>
+        </div>
+        <p class="text-slate-300 font-semibold text-sm mb-1">Aucune vidéo encore</p>
+        <p class="text-slate-600 text-xs mb-4">Commencez par importer votre premier contenu.</p>
+        <button @click="currentView = 'upload'"
+          class="btn-shimmer inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors glow">
+          <i class="ph-bold ph-cloud-arrow-up text-base"></i>
+          Importer une vidéo
+        </button>
+      </div>
+
+      <template x-for="v in videos" :key="v.id">
+        <div class="glass rounded-xl p-5 hover:border-brand/30 transition-colors cursor-pointer group"
+          @click="selectVideo(v); currentView = 'processing'">
+          <div class="flex items-center gap-4">
+            <!-- Status icon -->
+            <div :class="{
+                'bg-success/15 text-success': v.status === 'done',
+                'bg-brand/15 text-brand-light': ['extracting','analyzing','generating'].includes(v.status),
+                'bg-danger/15 text-danger': v.status === 'failed',
+                'bg-slate-700 text-slate-400': v.status === 'uploaded',
+              }" class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0">
+              <i x-show="v.status === 'done'" class="ph-bold ph-check-circle text-2xl"></i>
+              <i x-show="['extracting','analyzing','generating'].includes(v.status)" class="ph-bold ph-arrows-clockwise text-2xl animate-spin"></i>
+              <i x-show="v.status === 'failed'" class="ph-bold ph-warning-circle text-2xl"></i>
+              <i x-show="v.status === 'uploaded'" class="ph-bold ph-clock text-2xl"></i>
+            </div>
+
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-white group-hover:text-brand-light transition-colors truncate" x-text="v.title"></div>
+              <div class="flex items-center gap-2 md:gap-3 mt-1 text-xs text-slate-400 flex-wrap">
+                <span x-text="v.duration_fmt"></span>
+                <span x-show="v.resolution" x-text="v.resolution" class="hidden sm:inline"></span>
+                <span x-show="v.language" class="uppercase hidden sm:inline" x-text="v.language"></span>
+                <span x-show="v.clips_count > 0" class="text-success">✓ <span x-text="v.clips_count"></span> clips</span>
+              </div>
+
+              <!-- Progress bar -->
+              <div x-show="['extracting','analyzing','generating'].includes(v.status)" class="mt-2">
+                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                  <span x-text="statusLabel(v.status)"></span>
+                  <span x-text="v.progress + '%'"></span>
+                </div>
+                <div class="bg-dark-600 rounded-full h-1 overflow-hidden">
+                  <div class="bg-gradient-to-r from-brand to-accent h-1 rounded-full progress-bar progress-shimmer" :style="'width:' + v.progress + '%'"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1.5 md:gap-2 flex-shrink-0" @click.stop>
+              <span :class="{
+                  'bg-success/15 text-success border-success/30': v.status === 'done',
+                  'bg-brand/15 text-brand-light border-brand/30': ['extracting','analyzing','generating'].includes(v.status),
+                  'bg-danger/15 text-danger border-danger/30': v.status === 'failed',
+                  'bg-slate-700 text-slate-400 border-slate-600': v.status === 'uploaded',
+                }" class="hidden sm:inline text-xs px-2.5 py-1 rounded-full border font-medium" x-text="statusLabel(v.status)">
+              </span>
+              <button @click="deleteVideo(v.id)"
+                class="p-1.5 text-slate-500 hover:text-danger rounded-lg hover:bg-danger/10 transition-colors">
+                <i class="ph-bold ph-trash text-base"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+
+    <!-- ── TRAITEMENT EN COURS / DÉTAIL ──────────────────────────────────── -->
+    <div x-show="authToken && currentView === 'processing' && selectedVideo" class="space-y-6 animate-fade-in">
+
+      <div x-show="selectedVideo" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Colonne gauche : statut -->
+        <div class="space-y-4">
+          <!-- Card statut -->
+          <div class="glass rounded-xl p-5 relative"
+            :class="['extracting','analyzing','generating'].includes(selectedVideo?.status) ? 'scan-wrap' : ''"
+          >
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-white text-sm">Traitement</h3>
+              <span :class="{
+                  'bg-success/15 text-success border-success/30': selectedVideo?.status === 'done',
+                  'bg-brand/15 text-brand-light border-brand/30': ['extracting','analyzing','generating'].includes(selectedVideo?.status),
+                  'bg-danger/15 text-danger border-danger/30': selectedVideo?.status === 'failed',
+                  'bg-slate-700 text-slate-400 border-slate-600': selectedVideo?.status === 'uploaded',
+                }" class="text-xs px-2.5 py-1 rounded-full border font-medium"
+                x-text="statusLabel(selectedVideo?.status)">
+              </span>
+            </div>
+
+            <!-- Ring progress -->
+            <div class="flex items-center justify-center my-4">
+              <div class="relative w-24 h-24">
+                <svg class="w-24 h-24 -rotate-90" viewBox="0 0 36 36">
+                  <defs>
+                    <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%"   stop-color="#7c3aed"/>
+                      <stop offset="100%" stop-color="#06b6d4"/>
+                    </linearGradient>
+                  </defs>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#1a1a24" stroke-width="3"/>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="url(#ring-grad)" stroke-width="3"
+                    class="score-ring"
+                    style="filter: drop-shadow(0 0 4px rgba(124,58,237,.6))"
+                    :style="'stroke-dashoffset:' + (100 - (selectedVideo?.progress || 0))">
+                  </circle>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-xl font-bold gradient-text" x-text="(selectedVideo?.progress || 0) + '%'"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Waveform animée quand le traitement est actif -->
+          <div x-show="['extracting','analyzing','generating'].includes(selectedVideo?.status)"
+            class="flex flex-col items-center gap-2 mb-2">
+            <div class="waveform">
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+              <div class="waveform-bar"></div>
+            </div>
+            <span class="text-xs text-brand-light/70 font-medium tracking-wide">IA en cours…</span>
+          </div>
+
+          <div class="text-center text-sm text-slate-400" x-text="statusLabel(selectedVideo?.status)"></div>
+
+            <!-- Actions -->
+            <div class="mt-4 space-y-2">
+              <button x-show="selectedVideo?.status === 'done' || selectedVideo?.status === 'failed'"
+                @click="reprocessVideo()"
+                class="w-full flex items-center justify-center gap-2 bg-dark-600 hover:bg-dark-500 border border-dark-500 text-white text-sm py-2 rounded-lg transition-colors">
+                <i class="ph-bold ph-arrows-clockwise text-base"></i>
+                Retraiter
+              </button>
+              <button x-show="selectedVideo?.status === 'done'"
+                @click="currentView = 'clips'"
+                class="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark text-white text-sm font-medium py-2 rounded-lg transition-colors glow">
+                <i class="ph-bold ph-magic-wand text-base"></i>
+                Voir les clips
+              </button>
+            </div>
+          </div>
+
+          <!-- Infos vidéo -->
+          <div class="glass rounded-xl p-5 space-y-3" x-show="selectedVideo">
+            <h3 class="font-semibold text-white text-sm mb-2">Informations</h3>
+            <div class="space-y-2 text-xs">
+              <div class="flex justify-between">
+                <span class="text-slate-400">Durée</span>
+                <span class="text-white" x-text="selectedVideo?.duration_fmt || '--:--'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Résolution</span>
+                <span class="text-white" x-text="selectedVideo?.resolution || '—'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Langue</span>
+                <span class="text-white uppercase" x-text="selectedVideo?.language || '—'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Plateforme</span>
+                <span class="text-white" x-text="selectedVideo?.target_platform?.toUpperCase() || '—'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Clips cible</span>
+                <span class="text-white" x-text="selectedVideo?.target_clip_count || '—'"></span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Clips générés</span>
+                <span class="text-success font-semibold" x-text="selectedVideo?.clips_count || 0"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Colonne droite : logs -->
+        <div class="lg:col-span-2 glass rounded-xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white text-sm">Journal de traitement</h3>
+            <span class="text-xs text-slate-500" x-show="processingLogs.length" x-text="processingLogs.length + ' entrées'"></span>
+          </div>
+
+          <div class="log-box space-y-1 font-mono text-xs" x-ref="logBox">
+            <div x-show="processingLogs.length === 0" class="text-slate-600 text-center py-8">
+              En attente du démarrage…
+            </div>
+            <template x-for="(log, idx) in processingLogs" :key="idx">
+              <div :class="'log-' + log.level" class="flex gap-2">
+                <span class="text-slate-600 flex-shrink-0" x-text="log.time"></span>
+                <span x-text="log.message"></span>
+              </div>
+            </template>
+          </div>
+
+          <div x-show="selectedVideo?.error_msg" class="mt-4 p-3 bg-danger/10 border border-danger/30 rounded-lg">
+            <p class="text-danger text-xs font-mono" x-text="selectedVideo?.error_msg"></p>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="!selectedVideo" class="text-center py-16 text-slate-500">
+        <p class="text-sm">Sélectionnez une vidéo pour voir son traitement.</p>
+        <button @click="currentView = 'videos'" class="mt-2 text-brand-light hover:text-white text-sm underline">Voir mes vidéos →</button>
+      </div>
+    </div>
+
+
+    <!-- ── CLIPS ───────────────────────────────────────────────────────── -->
+    <div x-show="authToken && currentView === 'clips'" class="space-y-6 animate-fade-in">
+
+      <!-- Filtres -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex gap-1 bg-dark-700 rounded-xl p-1">
+          <template x-for="plat in ['all','tiktok','reels','shorts']" :key="plat">
+            <button @click="clipFilter = plat"
+              :class="clipFilter === plat ? 'bg-brand text-white' : 'text-slate-400 hover:text-white'"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize"
+              x-text="plat === 'all' ? 'Tous' : plat">
+            </button>
+          </template>
+        </div>
+        <span class="text-xs text-slate-500" x-text="filteredClips.length + ' clip(s)'"></span>
+      </div>
+
+      <!-- Grid clips -->
+      <div x-show="filteredClips.length === 0" class="text-center py-20 text-slate-500">
+        <div class="empty-ring-wrap inline-block mb-5">
+          <i class="ph-bold ph-magic-wand text-5xl text-brand/40 empty-float block"></i>
+        </div>
+        <p class="text-slate-300 font-medium text-sm mb-1">Aucun clip encore</p>
+        <p class="text-xs text-slate-600">Importez une vidéo pour générer vos premiers clips.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 cascade">
+        <template x-for="clip in filteredClips" :key="clip.id">
+
+          <!-- ── Carte clip style Opus Clip ── -->
+          <div class="glass rounded-xl overflow-hidden clip-card group cursor-pointer hover:border-brand/40 transition-all duration-300"
+            @click="openClipModal(clip)">
+
+            <!-- Zone thumbnail 9:16 -->
+            <div class="clip-thumb relative bg-dark-700" style="aspect-ratio:9/16; max-height:280px;">
+
+              <!-- Image -->
+              <img x-show="clip.thumbnail_url"
+                :src="clip.thumbnail_url" :alt="clip.suggested_title"
+                class="w-full h-full object-cover" />
+
+              <!-- Placeholder sans thumbnail -->
+              <div x-show="!clip.thumbnail_url"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                <i class="ph-bold ph-film-strip text-4xl text-slate-700"></i>
+                <span class="text-xs text-slate-600">Aperçu indisponible</span>
+              </div>
+
+              <!-- Durée (coin bas gauche) -->
+              <div class="absolute bottom-2 left-2 bg-black/70 backdrop-blur text-white text-xs px-2 py-0.5 rounded-full font-mono"
+                x-text="clip.duration_fmt">
+              </div>
+
+              <!-- Badge plateforme (coin haut gauche) -->
+              <div class="absolute top-2 left-2">
+                <span :class="{
+                    'bg-black text-white':                            clip.platform === 'tiktok',
+                    'bg-gradient-to-r from-purple-600 to-pink-500 text-white': clip.platform === 'reels',
+                    'bg-red-600 text-white':                          clip.platform === 'shorts',
+                    'bg-dark-700/80 text-slate-300':                  !['tiktok','reels','shorts'].includes(clip.platform),
+                  }" class="text-xs px-2 py-0.5 rounded-full font-medium backdrop-blur capitalize"
+                  x-text="clip.platform || 'all'">
+                </span>
+              </div>
+
+              <!-- Score ring Opus-style (coin haut droit) -->
+              <div class="absolute top-2 right-2">
+                <div class="score-badge w-9 h-9"
+                  :style="'--score-deg:' + (clip.composite_score * 360) + 'deg'">
+                  <div class="score-badge-ring"></div>
+                  <div class="relative z-10 w-9 h-9 rounded-full bg-dark-900/90 backdrop-blur flex items-center justify-center">
+                    <span class="text-xs font-bold gradient-text"
+                      x-text="(clip.composite_score * 100).toFixed(0)">
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bouton play central -->
+              <div class="clip-overlay absolute inset-0 flex items-center justify-center">
+                <div class="w-14 h-14 rounded-full bg-white/15 backdrop-blur-sm border border-white/25
+                  flex items-center justify-center
+                  transition-all duration-300 group-hover:scale-110 group-hover:bg-white/25">
+                  <svg class="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- ★ Reveal depuis le bas — style Opus Clip ★ -->
+              <div class="clip-reveal" @click.stop>
+                <!-- Titre -->
+                <p class="text-white text-sm font-semibold leading-snug mb-1.5 line-clamp-2"
+                  x-text="clip.suggested_title || 'Clip #' + clip.rank">
+                </p>
+                <!-- Hashtags -->
+                <div class="flex flex-wrap gap-1 mb-3">
+                  <template x-for="tag in (clip.suggested_hashtags || []).slice(0,3)" :key="tag">
+                    <span class="text-xs text-accent/80 bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded-full"
+                      x-text="tag">
+                    </span>
+                  </template>
+                </div>
+                <!-- Actions -->
+                <div class="flex gap-2">
+                  <!-- Télécharger -->
+                  <a :href="clip.file_url" download
+                    class="btn-shimmer flex-1 flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-medium py-2 rounded-lg transition-colors glow">
+                    <i class="ph-bold ph-download-simple text-sm"></i>
+                    Télécharger
+                  </a>
+                  <!-- TikTok -->
+                  <button @click="publishToTikTok(clip)"
+                    :disabled="publishingClips[clip.id] || clip.tiktok_status === 'pending'"
+                    :title="!tiktokConnected ? 'Connectez TikTok dans la sidebar' : 'Publier sur TikTok'"
+                    :class="{
+                      'bg-[#010101] border-[#444] text-white':       !['published','failed'].includes(clip.tiktok_status),
+                      'bg-success/20 border-success/40 text-success': clip.tiktok_status === 'published',
+                      'bg-danger/20  border-danger/40  text-danger':  clip.tiktok_status === 'failed',
+                      'opacity-50 cursor-not-allowed':                publishingClips[clip.id] || clip.tiktok_status === 'pending',
+                    }"
+                    class="border text-xs py-2 px-2.5 rounded-lg transition-colors flex items-center gap-1">
+                    <template x-if="clip.tiktok_status === 'published'"><span>✅</span></template>
+                    <template x-if="clip.tiktok_status === 'failed'"><span>❌</span></template>
+                    <template x-if="clip.tiktok_status === 'pending' || publishingClips[clip.id]">
+                      <i class="ph-bold ph-arrows-clockwise text-sm animate-spin"></i>
+                    </template>
+                    <template x-if="!clip.tiktok_status && !publishingClips[clip.id]">
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/>
+                      </svg>
+                    </template>
+                  </button>
+                  <!-- Copier tags -->
+                  <button @click="copyToClipboard(clip.suggested_hashtags?.join(' ') || '')"
+                    class="bg-dark-600 hover:bg-dark-500 border border-dark-500 text-slate-300 hover:text-white text-xs py-2 px-2.5 rounded-lg transition-colors"
+                    title="Copier les hashtags">
+                    <i class="ph-bold ph-hash text-sm"></i>
+                  </button>
+                </div><!-- /actions -->
+              </div><!-- /clip-reveal -->
+
+            </div><!-- /clip-thumb -->
+          </div><!-- /clip-card -->
+
+        </template>
+      </div><!-- /grid -->
+    </div><!-- /clips view -->
+
+    </div><!-- /max-w-7xl centered wrapper -->
+  </div><!-- end scrollable -->
+</main>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL CLIP DETAIL
+══════════════════════════════════════════════════════════════ -->
+<div x-show="clipModal" x-cloak
+  class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/70 backdrop-blur-sm"
+  @click.self="clipModal = null">
+  <div class="glass rounded-t-2xl sm:rounded-2xl w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto animate-slide-up" x-show="clipModal">
+    <template x-if="clipModal">
+      <div>
+        <div class="flex items-center justify-between p-5 border-b border-dark-600">
+          <h3 class="font-bold text-white" x-text="clipModal.suggested_title || 'Clip #' + clipModal.rank"></h3>
+          <button @click="clipModal = null" class="text-slate-400 hover:text-white transition-colors p-1">
+            <i class="ph-bold ph-x text-xl"></i>
+          </button>
+        </div>
+
+        <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Player -->
+          <div class="aspect-[9/16] max-h-[50vh] bg-black rounded-xl overflow-hidden mx-auto w-full max-w-xs">
+            <video x-show="clipModal.file_url"
+              :src="clipModal.file_url"
+              controls class="w-full h-full object-contain" />
+          </div>
+
+          <!-- Détails -->
+          <div class="space-y-4">
+            <!-- Score breakdown -->
+            <div class="glass rounded-xl p-4">
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Score IA</h4>
+              <div class="space-y-2">
+                <template x-for="[label, val] in [['Composite', clipModal.composite_score], ['Audio', clipModal.audio_score], ['NLP/Texte', clipModal.nlp_score], ['Visuel', clipModal.visual_score]]" :key="label">
+                  <div>
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-slate-400" x-text="label"></span>
+                      <span class="text-white font-medium" x-text="(val * 100).toFixed(0) + '%'"></span>
+                    </div>
+                    <div class="bg-dark-600 rounded-full h-1.5">
+                      <div class="bg-brand h-1.5 rounded-full" :style="'width:' + (val * 100) + '%'"></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Publication -->
+            <div class="glass rounded-xl p-4">
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Publication optimale</h4>
+              <div class="flex items-center gap-3">
+                <div class="bg-brand/20 text-brand-light rounded-xl p-3 text-center min-w-[56px]">
+                  <div class="text-sm font-bold" x-text="clipModal.best_publish_day?.slice(0,3)"></div>
+                </div>
+                <div>
+                  <div class="text-white font-semibold" x-text="clipModal.best_publish_time || '--:--'"></div>
+                  <div class="text-slate-500 text-xs capitalize" x-text="clipModal.platform"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transcript -->
+            <div class="glass rounded-xl p-4" x-show="clipModal.transcript">
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Transcription</h4>
+              <p class="text-slate-300 text-xs leading-relaxed" x-text="clipModal.transcript"></p>
+            </div>
+
+            <!-- Hashtags -->
+            <div class="glass rounded-xl p-4" x-show="clipModal.suggested_hashtags?.length">
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Hashtags</h4>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="tag in clipModal.suggested_hashtags" :key="tag">
+                  <span class="text-xs text-accent bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-full cursor-pointer hover:bg-accent/20 transition-colors"
+                    @click="copyToClipboard(tag)"
+                    x-text="tag">
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <!-- Publier sur TikTok -->
+            <div class="space-y-2">
+              <!-- Sélecteur confidentialité -->
+              <div x-show="tiktokConnected" class="flex gap-2 items-center">
+                <label class="text-xs text-slate-400 whitespace-nowrap">Visibilité :</label>
+                <select x-model="tiktokPrivacy"
+                  class="flex-1 bg-dark-700 border border-dark-500 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-brand/50">
+                  <option value="SELF_ONLY">Privé (brouillon)</option>
+                  <option value="FOLLOWER_OF_CREATOR">Abonnés</option>
+                  <option value="MUTUAL_FOLLOW_FRIENDS">Amis mutuels</option>
+                  <option value="PUBLIC_TO_EVERYONE">Public</option>
+                </select>
+              </div>
+
+              <button @click="publishToTikTok(clipModal, tiktokPrivacy || 'SELF_ONLY')"
+                :disabled="!tiktokConnected || publishingClips[clipModal?.id] || clipModal?.tiktok_status === 'pending'"
+                :class="{
+                  'opacity-50 cursor-not-allowed': !tiktokConnected || publishingClips[clipModal?.id] || clipModal?.tiktok_status === 'pending',
+                  'bg-success/20 border border-success/40 text-success hover:bg-success/30': clipModal?.tiktok_status === 'published',
+                  'bg-danger/20 border border-danger/40 text-danger hover:bg-danger/30':      clipModal?.tiktok_status === 'failed',
+                  'bg-[#010101] hover:bg-[#1a1a1a] border border-[#333] text-white':          clipModal?.tiktok_status !== 'published' && clipModal?.tiktok_status !== 'failed',
+                }"
+                class="w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-xl transition-colors text-sm">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z"/>
+                </svg>
+                <span x-text="
+                  !tiktokConnected                              ? 'Connectez TikTok (sidebar)' :
+                  clipModal?.tiktok_status === 'published'      ? '✅ Publié sur TikTok' :
+                  clipModal?.tiktok_status === 'failed'         ? '❌ Échec — Réessayer' :
+                  clipModal?.tiktok_status === 'pending' || publishingClips[clipModal?.id] ? '⏳ Publication en cours…' :
+                  'Envoyer en brouillon TikTok'
+                "></span>
+              </button>
+            </div>
+
+            <!-- Download -->
+            <a :href="clipModal.file_url" download
+              class="flex items-center justify-center gap-2 w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition-colors glow text-sm">
+              <i class="ph-bold ph-download-simple text-base"></i>
+              Télécharger ce clip
+            </a>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PANEL ADMIN
+══════════════════════════════════════════════════════════════ -->
+<div x-show="authToken && currentView === 'admin'" class="space-y-6 animate-fade-in">
+
+  <!-- Chargement -->
+  <div x-show="adminLoading" class="flex items-center justify-center py-20 text-slate-400 text-sm">
+    <i class="ph-bold ph-arrows-clockwise text-2xl animate-spin mr-3"></i> Chargement…
+  </div>
+
+  <template x-if="!adminLoading">
+    <div class="space-y-6">
+
+      <!-- ── Stats globales ── -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 cascade">
+        <!-- En ligne — mise en avant -->
+        <div class="glass rounded-xl p-4 text-center border border-success/30 bg-success/5 col-span-2 sm:col-span-1 card-lift">
+          <div class="flex items-center justify-center gap-2 mb-1">
+            <span class="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
+            <div class="text-2xl font-bold text-success stat-pop"
+              x-text="adminStats.online_users ?? '0'"
+              :data-count="adminStats.online_users ?? 0">
+            </div>
+          </div>
+          <div class="text-xs text-success/80 font-medium">En ligne</div>
+          <div class="text-xs text-slate-500 mt-0.5">15 dernières min</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-white stat-pop" x-text="adminStats.total_users ?? '—'" :data-count="adminStats.total_users"></div>
+          <div class="text-xs text-slate-400 mt-1">Utilisateurs</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-brand-light stat-pop" x-text="adminStats.active_users ?? '—'" :data-count="adminStats.active_users"></div>
+          <div class="text-xs text-slate-400 mt-1">Comptes actifs</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-slate-300 stat-pop" x-text="adminStats.verified_users ?? '—'" :data-count="adminStats.verified_users"></div>
+          <div class="text-xs text-slate-400 mt-1">Emails vérifiés</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-white stat-pop" x-text="adminStats.total_videos ?? '—'" :data-count="adminStats.total_videos"></div>
+          <div class="text-xs text-slate-400 mt-1">Vidéos</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-accent stat-pop" x-text="adminStats.total_clips ?? '—'" :data-count="adminStats.total_clips"></div>
+          <div class="text-xs text-slate-400 mt-1">Clips prêts</div>
+        </div>
+        <div class="glass rounded-xl p-4 text-center card-lift hover-border">
+          <div class="text-2xl font-bold text-warn stat-pop" x-text="adminStats.videos_processing ?? '—'" :data-count="adminStats.videos_processing"></div>
+          <div class="text-xs text-slate-400 mt-1">En traitement</div>
+        </div>
+      </div>
+
+      <!-- ── Liste utilisateurs ── -->
+      <div class="glass rounded-xl overflow-hidden">
+        <div class="p-5 border-b border-dark-600 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div class="flex items-center gap-2 flex-1">
+            <i class="ph-bold ph-users text-brand-light text-lg"></i>
+            <h3 class="font-semibold text-white">Utilisateurs</h3>
+            <span class="text-xs bg-brand/20 text-brand-light px-2 py-0.5 rounded-full" x-text="adminUsers.length"></span>
+          </div>
+          <!-- Recherche -->
+          <div class="relative">
+            <i class="ph-bold ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+            <input x-model="adminSearch"
+              class="bg-dark-700 border border-dark-500 focus:border-brand rounded-lg pl-8 pr-3 py-2 text-sm text-white outline-none transition-colors w-56"
+              placeholder="Rechercher…" />
+          </div>
+          <!-- Rafraîchir -->
+          <button @click="loadAdminData()"
+            class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-dark-700 hover:bg-dark-600 border border-dark-500 px-3 py-2 rounded-lg transition-colors">
+            <i class="ph-bold ph-arrows-clockwise text-sm"></i>
+            Actualiser
+          </button>
+        </div>
+
+        <!-- Table desktop -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-dark-600">
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-5 py-3">Utilisateur</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden md:table-cell">Rôle</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Statut</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Vidéos</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden lg:table-cell">Clips</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden xl:table-cell">Inscrit le</th>
+                <th class="text-left text-xs text-slate-500 font-medium uppercase tracking-wide px-4 py-3 hidden xl:table-cell">Dernière activité</th>
+                <th class="text-right text-xs text-slate-500 font-medium uppercase tracking-wide px-5 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="u in adminUsersFiltered" :key="u.id">
+                <tr class="border-b border-dark-600/50 hover:bg-dark-600/30 transition-colors">
+                  <!-- Nom + email -->
+                  <td class="px-5 py-3">
+                    <div class="flex items-center gap-3">
+                      <!-- Avatar + indicateur en ligne -->
+                      <div class="relative flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-accent flex items-center justify-center text-white font-bold text-xs"
+                          x-text="(u.first_name || u.email)[0].toUpperCase()">
+                        </div>
+                        <span x-show="u.is_online"
+                          class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-dark-800 animate-pulse">
+                        </span>
+                      </div>
+                      <div class="min-w-0">
+                        <div class="text-white font-medium truncate" x-text="(u.first_name + ' ' + u.last_name).trim() || '—'"></div>
+                        <div class="text-xs text-slate-500 truncate" x-text="u.email"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <!-- Rôle -->
+                  <td class="px-4 py-3 hidden md:table-cell">
+                    <span :class="u.role === 'admin' ? 'bg-brand/20 text-brand-light border-brand/30' : 'bg-dark-600 text-slate-400 border-dark-500'"
+                      class="border text-xs px-2 py-0.5 rounded-full font-medium" x-text="u.role">
+                    </span>
+                  </td>
+                  <!-- Statut compte -->
+                  <td class="px-4 py-3 hidden sm:table-cell">
+                    <div class="space-y-1">
+                      <span :class="u.is_active ? 'text-success' : 'text-danger'"
+                        class="text-xs font-medium flex items-center gap-1">
+                        <span :class="u.is_active ? 'bg-success' : 'bg-danger'" class="w-1.5 h-1.5 rounded-full inline-block"></span>
+                        <span x-text="u.is_active ? 'Actif' : 'Inactif'"></span>
+                      </span>
+                      <span :class="u.is_email_verified ? 'text-slate-400' : 'text-warn'"
+                        class="text-xs flex items-center gap-1">
+                        <i :class="u.is_email_verified ? 'ph-check' : 'ph-warning'" class="ph-bold text-xs"></i>
+                        <span x-text="u.is_email_verified ? 'Email vérifié' : 'Non vérifié'"></span>
+                      </span>
+                    </div>
+                  </td>
+                  <!-- Vidéos -->
+                  <td class="px-4 py-3 hidden lg:table-cell text-slate-300 text-center" x-text="u.videos_count ?? 0"></td>
+                  <!-- Clips -->
+                  <td class="px-4 py-3 hidden lg:table-cell text-slate-300 text-center" x-text="u.clips_count ?? 0"></td>
+                  <!-- Date inscription -->
+                  <td class="px-4 py-3 hidden xl:table-cell text-slate-400 text-xs" x-text="u.created_at"></td>
+                  <!-- Dernière activité -->
+                  <td class="px-4 py-3 hidden xl:table-cell text-xs">
+                    <span x-show="u.is_online" class="flex items-center gap-1 text-success font-medium">
+                      <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block"></span>
+                      En ligne
+                    </span>
+                    <span x-show="!u.is_online" class="text-slate-500"
+                      x-text="u.last_seen || 'Jamais connecté'">
+                    </span>
+                  </td>
+                  <!-- Actions -->
+                  <td class="px-5 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      <!-- Activer / Désactiver -->
+                      <button @click="adminToggleActive(u)"
+                        :title="u.is_active ? 'Désactiver le compte' : 'Activer le compte'"
+                        :class="u.is_active ? 'text-slate-400 hover:text-warn' : 'text-slate-400 hover:text-success'"
+                        class="p-1.5 rounded-lg hover:bg-dark-600 transition-colors">
+                        <i :class="u.is_active ? 'ph-prohibit' : 'ph-check-circle'" class="ph-bold text-base"></i>
+                      </button>
+                      <!-- Supprimer -->
+                      <button @click="adminDeleteUser(u.id, u.email)"
+                        :disabled="u.id === adminCurrentUserId"
+                        title="Supprimer cet utilisateur"
+                        class="p-1.5 rounded-lg text-slate-400 hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i class="ph-bold ph-trash text-base"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+
+              <!-- Aucun résultat -->
+              <tr x-show="adminUsersFiltered.length === 0">
+                <td colspan="8" class="text-center text-slate-500 text-sm py-12">
+                  <i class="ph-bold ph-users text-3xl block mb-2 opacity-30"></i>
+                  Aucun utilisateur trouvé
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </template>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     FAB ADMIN — bouton flottant en bas à droite sur la vue admin
+══════════════════════════════════════════════════════════════ -->
+<button
+  x-show="authToken && currentView === 'admin'"
+  x-transition:enter="transition ease-out duration-200"
+  x-transition:enter-start="opacity-0 scale-75"
+  x-transition:enter-end="opacity-100 scale-100"
+  x-transition:leave="transition ease-in duration-150"
+  x-transition:leave-start="opacity-100 scale-100"
+  x-transition:leave-end="opacity-0 scale-75"
+  @click="loadAdminData()"
+  :disabled="adminLoading"
+  title="Actualiser les données admin"
+  class="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-semibold text-sm px-5 py-3 rounded-2xl shadow-lg glow-animated btn-shimmer transition-colors disabled:opacity-60"
+  style="box-shadow: 0 8px 32px rgba(124,58,237,.45);">
+  <i class="ph-bold ph-arrows-clockwise text-lg" :class="adminLoading ? 'animate-spin' : ''"></i>
+  <span x-text="adminLoading ? 'Actualisation…' : 'Actualiser le panel'"></span>
+</button>
+
+<!-- ══════════════════════════════════════════════════════════════
+     TOAST
+══════════════════════════════════════════════════════════════ -->
+<div class="fixed bottom-5 right-5 z-50 space-y-2">
+  <template x-for="toast in toasts" :key="toast.id">
+    <div :class="{
+        'border-success/30 bg-success/10': toast.type === 'success',
+        'border-danger/30 bg-danger/10':   toast.type === 'error',
+        'border-brand/30 bg-brand/10':     toast.type === 'info',
+        'border-warn/30 bg-warn/10':       toast.type === 'warn',
+      }" class="toast-item flex items-center gap-3 glass border rounded-xl px-4 py-3 min-w-64 max-w-sm text-sm shadow-xl">
+      <span x-text="toast.message" class="text-white flex-1"></span>
+      <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-white text-xs flex-shrink-0">✕</button>
+    </div>
+  </template>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     ALPINE.JS APP
+══════════════════════════════════════════════════════════════ -->
+<script>
+const API = window.location.origin + '/api';
+
+function app() {
+  return {
+    // ── Auth ──────────────────────────────────────────────────────────────
+    authToken:        localStorage.getItem('clipai_token') || '',
+    refreshToken:     localStorage.getItem('clipai_refresh') || '',
+    userEmail:        localStorage.getItem('clipai_email') || '',
+    userRole:         localStorage.getItem('clipai_role')  || '',
+
+    // Connexion
+    authMode:      'login',   // 'login' | 'register'
+    loginEmail:    '',
+    loginPassword: '',
+    loginLoading:  false,
+    loginError:    '',
+
+    // Inscription
+    registerFirstName:       '',
+    registerLastName:        '',
+    registerEmail:           '',
+    registerPassword:        '',
+    registerPasswordConfirm: '',
+    registerLoading:         false,
+    registerError:           '',
+
+    // Renvoi email
+    resendLoading: false,
+
+    // ── Nav ───────────────────────────────────────────────────────────────
+    sidebarOpen: false,
+    currentView: 'dashboard',
+
+    // ── Admin ─────────────────────────────────────────────────────────────
+    adminUsers:   [],
+    adminStats:   {},
+    adminLoading: false,
+    adminSearch:  '',
+
+    // ── Data ──────────────────────────────────────────────────────────────
+    videos:        [],
+    allClips:      [],
+    stats:         {},
+    selectedVideo: null,
+    processingLogs:[],
+    processingCount: 0,
+
+    // ── Upload ────────────────────────────────────────────────────────────
+    uploadMode:      'file',
+    uploadFile:      null,
+    uploadUrl:       '',
+    uploadTitle:     '',
+    uploadPlatform:  'all',
+    uploadClipCount: 5,
+    uploadMinDur:    20,
+    uploadMaxDur:    60,
+    uploadLoading:   false,
+    uploadProgress:  0,
+    uploadError:     '',
+    dragOver:        false,
+
+    // ── Commande IA ───────────────────────────────────────────────────────
+    commandInput: '',
+    cmdLoading:   false,
+    chatHistory:  [],
+    suggestions: [
+      'Génère 5 clips TikTok de 30s',
+      'Crée des Reels pour ma dernière vidéo',
+      'Montre mes clips',
+      'Statistiques',
+    ],
+
+    // ── Clips ─────────────────────────────────────────────────────────────
+    clipFilter: 'all',
+    clipModal:  null,
+
+    // ── TikTok ────────────────────────────────────────────────────────────
+    tiktokConnected:   false,
+    tiktokOpenId:      '',
+    tiktokLoading:     false,
+    tiktokPrivacy:     'SELF_ONLY',
+    publishingClips:   {},  // clip_id -> true/false
+
+    // ── Toasts ────────────────────────────────────────────────────────────
+    toasts: [],
+    _toastId: 0,
+
+    // ── Loading states ────────────────────────────────────────────────────
+    videosLoading: false,
+    clipsLoading:  false,
+
+    // ── Polling ───────────────────────────────────────────────────────────
+    _pollInterval: null,
+
+    // ─────────────────────────────────────────────────────────────────────
+    // INIT
+    // ─────────────────────────────────────────────────────────────────────
+    async init() {
+      const urlParams = new URLSearchParams(window.location.search);
+
+      // ── Retour vérification email (?verified=success|error) ──────────────
+      const verified = urlParams.get('verified');
+      if (verified) {
+        window.history.replaceState({}, '', '/');
+        if (verified === 'success') {
+          this.toast('✅ Email confirmé ! Vous pouvez vous connecter.', 'success');
+          this.authMode = 'login';
+        } else {
+          const msg = urlParams.get('msg') || 'erreur';
+          this.toast(`Lien de vérification invalide ou expiré (${msg}).`, 'error');
+        }
+      }
+
+      // ── Retour OAuth TikTok (?tiktok=connected) ───────────────────────────
+      const tiktokResult = urlParams.get('tiktok');
+      if (tiktokResult) {
+        window.history.replaceState({}, '', '/');
+        if (tiktokResult === 'connected') this.toast('✅ TikTok connecté avec succès !', 'success');
+        else if (tiktokResult === 'denied')  this.toast('TikTok : autorisation refusée', 'warn');
+        else                                 this.toast('TikTok : erreur de connexion', 'error');
+      }
+
+      if (this.authToken) {
+        await this.loadAll();
+        await this.checkTikTokStatus();
+        this.startPolling();
+      }
+
+      // Positionner la pill nav après le rendu initial
+      this.$nextTick(() => this.updateNavPill());
+    },
+
+    async loadAll() {
+      // loadVideos en premier — loadAllClips en dépend (filtre sur videos.status)
+      await Promise.all([this.loadVideos(), this.loadStats()]);
+      await this.loadAllClips();
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // AUTH
+    // ─────────────────────────────────────────────────────────────────────
+    async login() {
+      this.loginLoading = true;
+      this.loginError   = '';
+      try {
+        const res = await fetch(`${API}/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.loginEmail, password: this.loginPassword }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          // Détecter le code spécial "email non vérifié"
+          const errs = data.errors || {};
+          const msgs = Object.values(errs).flat().join(' ');
+          if (msgs.includes('email_not_verified')) {
+            this.loginError = 'email_not_verified';
+          } else {
+            throw new Error(data.message || msgs || 'Identifiants incorrects');
+          }
+          return;
+        }
+        const token    = data.data?.tokens?.access;
+        const refresh  = data.data?.tokens?.refresh;
+        const userRole = data.data?.user?.role || 'client';
+        if (!token) throw new Error('Token introuvable dans la réponse');
+        this.authToken    = token;
+        this.refreshToken = refresh || '';
+        this.userRole     = userRole;
+        localStorage.setItem('clipai_token',   token);
+        localStorage.setItem('clipai_refresh',  refresh || '');
+        localStorage.setItem('clipai_email',   this.loginEmail);
+        localStorage.setItem('clipai_role',    userRole);
+        this.userEmail = this.loginEmail;
+        await this.loadAll();
+        await this.checkTikTokStatus();
+        this.startPolling();
+        this.toast('Connecté avec succès', 'success');
+      } catch (e) {
+        this.loginError = e.message;
+      } finally {
+        this.loginLoading = false;
+      }
+    },
+
+    async register() {
+      this.registerError   = '';
+      this.registerLoading = true;
+
+      // Vérification côté client avant d'appeler l'API
+      if (this.registerPassword !== this.registerPasswordConfirm) {
+        this.registerError   = 'Les mots de passe ne correspondent pas.';
+        this.registerLoading = false;
+        return;
+      }
+      if (this.registerPassword.length < 8) {
+        this.registerError   = 'Le mot de passe doit faire au moins 8 caractères.';
+        this.registerLoading = false;
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API}/auth/register/`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name:       this.registerFirstName,
+            last_name:        this.registerLastName,
+            email:            this.registerEmail,
+            password:         this.registerPassword,
+            password_confirm: this.registerPasswordConfirm,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          // Récupère le premier message d'erreur retourné par l'API
+          const errs = data.errors || {};
+          const msg  = Object.values(errs).flat()[0]
+                    || data.message
+                    || 'Erreur lors de l\'inscription.';
+          throw new Error(msg);
+        }
+
+        // ✅ Compte créé → afficher l'écran "vérifiez votre email"
+        this.registerPassword        = '';
+        this.registerPasswordConfirm = '';
+        this.registerFirstName       = this.registerLastName = '';
+        this.authMode = 'verify_pending';   // affiche l'écran d'attente
+        this.toast('✅ Compte créé ! Vérifiez votre email.', 'success');
+
+      } catch (e) {
+        this.registerError = e.message;
+      } finally {
+        this.registerLoading = false;
+      }
+    },
+
+    async resendVerification() {
+      if (!this.registerEmail) {
+        this.toast('Entrez votre email d\'abord.', 'warn');
+        return;
+      }
+      this.resendLoading = true;
+      try {
+        await fetch(`${API}/auth/resend-verification/`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ email: this.registerEmail }),
+        });
+        this.toast('📧 Email de confirmation renvoyé !', 'success');
+      } catch (e) {
+        this.toast('Erreur lors de l\'envoi', 'error');
+      } finally {
+        this.resendLoading = false;
+      }
+    },
+
+    logout() {
+      this.authToken    = '';
+      this.refreshToken = '';
+      this.userEmail    = '';
+      this.userRole     = '';
+      localStorage.removeItem('clipai_token');
+      localStorage.removeItem('clipai_refresh');
+      localStorage.removeItem('clipai_email');
+      localStorage.removeItem('clipai_role');
+      this.stopPolling();
+      this.videos   = [];
+      this.allClips = [];
+      this.stats    = {};
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // API HELPERS
+    // ─────────────────────────────────────────────────────────────────────
+    async api(path, opts = {}) {
+      const res = await fetch(`${API}${path}`, {
+        ...opts,
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          ...(opts.headers || {}),
+        },
+      });
+
+      // Token expiré → tenter un renouvellement automatique
+      if (res.status === 401) {
+        const renewed = await this._tryRefreshToken();
+        if (renewed) {
+          // Réessayer la requête originale avec le nouveau token
+          return fetch(`${API}${path}`, {
+            ...opts,
+            headers: {
+              'Authorization': `Bearer ${this.authToken}`,
+              ...(opts.headers || {}),
+            },
+          });
+        }
+        // Refresh aussi expiré → déconnexion
+        this.logout();
+        this.toast('Session expirée, reconnectez-vous.', 'warn');
+        throw new Error('Session expirée');
+      }
+      return res;
+    },
+
+    // Renouvelle silencieusement le token d'accès via le refresh token
+    async _tryRefreshToken() {
+      if (!this.refreshToken) return false;
+      try {
+        const res = await fetch(`${API}/auth/token/refresh/`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ refresh: this.refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        const newAccess  = data.data?.access  || data.access;
+        const newRefresh = data.data?.refresh || data.refresh || this.refreshToken;
+        if (!newAccess) return false;
+        this.authToken    = newAccess;
+        this.refreshToken = newRefresh;
+        localStorage.setItem('clipai_token',  newAccess);
+        localStorage.setItem('clipai_refresh', newRefresh);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async apiJson(path, opts = {}) {
+      const res = await this.api(path, {
+        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        ...opts,
+      });
+      return res.json();
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DONNÉES
+    // ─────────────────────────────────────────────────────────────────────
+    async loadVideos() {
+      this.videosLoading = true;
+      try {
+        const data = await this.apiJson('/videos/');
+        this.videos = data.results || [];
+        this.processingCount = this.videos.filter(v =>
+          ['extracting','analyzing','generating'].includes(v.status)
+        ).length;
+      } catch (e) { console.error(e); }
+      finally { this.videosLoading = false; }
+    },
+
+    async loadAllClips() {
+      try {
+        const clips = [];
+        for (const v of this.videos.filter(v => v.status === 'done')) {
+          const data = await this.apiJson(`/videos/${v.id}/clips/`);
+          clips.push(...(data.results || []));
+        }
+        this.allClips = clips;
+      } catch (e) { console.error(e); }
+    },
+
+    async loadStats() {
+      try {
+        this.stats = await this.apiJson('/videos/stats/');
+        this.runCounters();
+      } catch (e) { console.error(e); }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // POLLING
+    // ─────────────────────────────────────────────────────────────────────
+    startPolling() {
+      this._pollInterval = setInterval(async () => {
+        const processing = this.videos.filter(v =>
+          ['extracting','analyzing','generating'].includes(v.status)
+        );
+        if (processing.length === 0) return;
+
+        for (const v of processing) {
+          try {
+            const data = await this.apiJson(`/videos/${v.id}/status/`);
+            const idx  = this.videos.findIndex(x => x.id === v.id);
+            if (idx !== -1) {
+              this.videos[idx] = { ...this.videos[idx], ...data };
+            }
+
+            // Màj vidéo sélectionnée (logs temps réel)
+            if (this.selectedVideo?.id === v.id) {
+              this.selectedVideo  = { ...this.selectedVideo, ...data };
+              this.processingLogs = data.logs || [];
+              this.$nextTick(() => {
+                const el = this.$refs.logBox;
+                if (el) el.scrollTop = el.scrollHeight;
+              });
+            }
+
+            // Recharger les clips dès qu'UNE vidéo passe "done"
+            // — peu importe si elle est sélectionnée ou non
+            if (data.status === 'done') {
+              const title = this.videos[idx]?.title || v.title;
+              this.toast(`✅ "${title}" traité !`, 'success');
+              await this.loadAllClips();
+              await this.loadStats();
+            }
+          } catch (e) { console.error(e); }
+        }
+
+        this.processingCount = this.videos.filter(v =>
+          ['extracting','analyzing','generating'].includes(v.status)
+        ).length;
+      }, 2500);
+    },
+
+    stopPolling() {
+      if (this._pollInterval) clearInterval(this._pollInterval);
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // SÉLECTION VIDÉO
+    // ─────────────────────────────────────────────────────────────────────
+    async selectVideo(v) {
+      this.selectedVideo  = v;
+      this.processingLogs = [];
+      try {
+        const detail = await this.apiJson(`/videos/${v.id}/`);
+        this.selectedVideo  = detail;
+        this.processingLogs = detail.logs || [];
+      } catch (e) { console.error(e); }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // UPLOAD
+    // ─────────────────────────────────────────────────────────────────────
+    handleDrop(e) {
+      this.dragOver = false;
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('video/')) {
+        this.uploadFile = file;
+        if (!this.uploadTitle) this.uploadTitle = file.name.replace(/\.[^.]+$/, '');
+      } else {
+        this.toast('Format vidéo non supporté', 'error');
+      }
+    },
+
+    handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        this.uploadFile = file;
+        if (!this.uploadTitle) this.uploadTitle = file.name.replace(/\.[^.]+$/, '');
+      }
+    },
+
+    async submitUpload() {
+      this.uploadError   = '';
+      this.uploadLoading = true;
+      this.uploadProgress = 0;
+
+      try {
+        let video;
+
+        if (this.uploadMode === 'file' && this.uploadFile) {
+          const form = new FormData();
+          form.append('file',              this.uploadFile);
+          form.append('title',             this.uploadTitle || this.uploadFile.name);
+          form.append('target_platform',   this.uploadPlatform);
+          form.append('target_clip_count', this.uploadClipCount);
+          form.append('min_clip_duration', this.uploadMinDur);
+          form.append('max_clip_duration', this.uploadMaxDur);
+
+          // Upload avec progress via XHR
+          video = await this._uploadWithProgress(form);
+
+        } else if (this.uploadMode === 'url' && this.uploadUrl) {
+          video = await this.apiJson('/videos/from-url/', {
+            method: 'POST',
+            body: JSON.stringify({
+              url:                this.uploadUrl,
+              title:              this.uploadTitle,
+              target_platform:    this.uploadPlatform,
+              target_clip_count:  this.uploadClipCount,
+              min_clip_duration:  this.uploadMinDur,
+              max_clip_duration:  this.uploadMaxDur,
+            }),
+          });
+        }
+
+        if (video?.id) {
+          this.videos.unshift(video);
+          this.selectedVideo = video;
+          this.currentView   = 'processing';
+          this.toast('🚀 Vidéo importée, traitement lancé !', 'success');
+          // Reset form
+          this.uploadFile = null; this.uploadUrl = ''; this.uploadTitle = '';
+        } else {
+          throw new Error(JSON.stringify(video));
+        }
+
+      } catch (e) {
+        this.uploadError = e.message || 'Erreur lors de l\'upload';
+        this.toast(this.uploadError, 'error');
+      } finally {
+        this.uploadLoading  = false;
+        this.uploadProgress = 0;
+      }
+    },
+
+    _uploadWithProgress(formData) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API}/videos/upload/`);
+        xhr.setRequestHeader('Authorization', `Bearer ${this.authToken}`);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            this.uploadProgress = Math.round((e.loaded / e.total) * 100);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error(xhr.responseText));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Erreur réseau'));
+        xhr.send(formData);
+      });
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // COMMANDE IA
+    // ─────────────────────────────────────────────────────────────────────
+    async sendCommand() {
+      const cmd = this.commandInput.trim();
+      if (!cmd || this.cmdLoading) return;
+
+      this.chatHistory.push({ role: 'user', content: cmd });
+      this.commandInput = '';
+      this.cmdLoading   = true;
+
+      this.$nextTick(() => {
+        const el = this.$refs.chatHistory;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+
+      try {
+        const data = await this.apiJson('/videos/command/', {
+          method: 'POST',
+          body: JSON.stringify({ command: cmd }),
+        });
+
+        let replyText = data.message || 'Commande exécutée.';
+
+        // Actions auto
+        if (data.type === 'processing' && data.video_id) {
+          const v = this.videos.find(x => x.id === data.video_id);
+          if (v) { this.selectedVideo = v; }
+          await this.loadVideos();
+        }
+        if (data.type === 'video_list') {
+          this.videos = data.videos || this.videos;
+        }
+        if (data.type === 'clip_list') {
+          this.allClips = data.clips || this.allClips;
+          if (data.clips?.length) {
+            replyText += `\n\n👉 Cliquez sur "Clips générés" pour les voir.`;
+          }
+        }
+        if (data.type === 'stats') {
+          await this.loadStats();
+        }
+
+        this.chatHistory.push({ role: 'assistant', content: replyText });
+
+      } catch (e) {
+        this.chatHistory.push({ role: 'assistant', content: `❌ Erreur : ${e.message}` });
+      } finally {
+        this.cmdLoading = false;
+        this.$nextTick(() => {
+          const el = this.$refs.chatHistory;
+          if (el) el.scrollTop = el.scrollHeight;
+        });
+      }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // VIDÉOS — actions
+    // ─────────────────────────────────────────────────────────────────────
+    async deleteVideo(id) {
+      if (!confirm('Supprimer cette vidéo et tous ses clips ?')) return;
+      try {
+        await this.api(`/videos/${id}/delete/`, { method: 'DELETE' });
+        this.videos = this.videos.filter(v => v.id !== id);
+        this.allClips = this.allClips.filter(c => c.video !== id);
+        if (this.selectedVideo?.id === id) this.selectedVideo = null;
+        this.toast('Vidéo supprimée', 'info');
+        await this.loadStats();
+      } catch (e) { this.toast('Erreur suppression', 'error'); }
+    },
+
+    async reprocessVideo() {
+      if (!this.selectedVideo) return;
+      try {
+        await this.apiJson(`/videos/${this.selectedVideo.id}/reprocess/`, { method: 'POST' });
+        await this.selectVideo(this.selectedVideo);
+        this.toast('Retraitement lancé', 'info');
+      } catch (e) { this.toast(e.message, 'error'); }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CLIPS
+    // ─────────────────────────────────────────────────────────────────────
+    get filteredClips() {
+      if (this.clipFilter === 'all') return this.allClips;
+      return this.allClips.filter(c => c.platform === this.clipFilter);
+    },
+
+    openClipModal(clip) {
+      this.clipModal = clip;
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // COMPUTED / HELPERS
+    // ─────────────────────────────────────────────────────────────────────
+    get navItemsBase() {
+      return [
+        { id: 'dashboard',  label: 'Tableau de bord', icon: '<i class="ph-bold ph-squares-four text-base"></i>' },
+        { id: 'upload',     label: 'Importer',         icon: '<i class="ph-bold ph-cloud-arrow-up text-base"></i>' },
+        { id: 'videos',     label: 'Mes vidéos',       icon: '<i class="ph-bold ph-film-strip text-base"></i>' },
+        { id: 'processing', label: 'Traitement',       icon: '<i class="ph-bold ph-gear-six text-base"></i>' },
+        { id: 'clips',      label: 'Clips générés',    icon: '<i class="ph-bold ph-magic-wand text-base"></i>' },
+      ];
+    },
+
+    // Garde navItems pour compatibilité (viewTitle, etc.)
+    get navItems() {
+      const base = [...this.navItemsBase];
+      if (this.userRole === 'admin') {
+        base.push({ id: 'admin', label: 'Panel Admin', icon: '<i class="ph-bold ph-shield-check text-base"></i>' });
+      }
+      return base;
+    },
+
+    get adminUsersFiltered() {
+      if (!this.adminSearch.trim()) return this.adminUsers;
+      const q = this.adminSearch.toLowerCase();
+      return this.adminUsers.filter(u =>
+        u.email.toLowerCase().includes(q) ||
+        (u.first_name + ' ' + u.last_name).toLowerCase().includes(q)
+      );
+    },
+
+    get adminCurrentUserId() {
+      // Permet de bloquer la suppression de son propre compte depuis le panel
+      return this.adminUsers.find(u => u.email === this.userEmail)?.id || null;
+    },
+
+    get viewTitle() {
+      const labels = {
+        dashboard:  'Tableau de bord',
+        upload:     'Importer une vidéo',
+        videos:     'Mes vidéos',
+        processing: 'Traitement',
+        clips:      'Clips générés',
+        admin:      'Panel Administrateur',
+      };
+      return labels[this.currentView] || 'ClipAI';
+    },
+
+    get statCards() {
+      return [
+        { label: 'Vidéos',      value: this.stats.total_videos || 0,      sub: `${this.stats.videos_done || 0} terminées`,  icon: '<i class="ph-bold ph-video text-lg"></i>' },
+        { label: 'Clips',       value: this.stats.total_clips || 0,       sub: 'prêts à publier',                           icon: '<i class="ph-bold ph-magic-wand text-lg"></i>' },
+        { label: 'En cours',    value: this.stats.videos_processing || 0, sub: 'traitement actif',                          icon: '<i class="ph-bold ph-arrows-clockwise text-lg"></i>' },
+        { label: 'Score moyen', value: this.stats.avg_score ? (this.stats.avg_score * 100).toFixed(0) + '%' : '--', sub: 'engagement IA', icon: '<i class="ph-bold ph-trend-up text-lg"></i>' },
+      ];
+    },
+
+    statusLabel(s) {
+      const labels = {
+        uploaded:   'En attente',
+        extracting: 'Extraction',
+        analyzing:  'Analyse IA',
+        generating: 'Génération',
+        done:       'Terminé',
+        failed:     'Échoué',
+      };
+      return labels[s] || s || '—';
+    },
+
+    formatMessage(text) {
+      // Markdown basique : **bold**, sauts de ligne
+      return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+        .replace(/\n/g, '<br>');
+    },
+
+    copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => this.toast('Copié !', 'success'));
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // NAV PILL GLISSANT (style Opus Clip)
+    // ─────────────────────────────────────────────────────────────────────
+    updateNavPill() {
+      const pill = document.getElementById('nav-pill');
+      const nav  = document.getElementById('sidebar-nav');
+      if (!pill || !nav) return;
+      const activeBtn = nav.querySelector(`[data-view="${this.currentView}"]`);
+      if (!activeBtn) return;
+      const navRect = nav.getBoundingClientRect();
+      const btnRect = activeBtn.getBoundingClientRect();
+      pill.style.top     = (btnRect.top - navRect.top + nav.scrollTop) + 'px';
+      pill.style.height  = btnRect.height + 'px';
+      pill.style.opacity = '1';
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // COMPTEUR ANIMÉ
+    // ─────────────────────────────────────────────────────────────────────
+    /**
+     * Anime un nombre de 0 à `target` en `duration` ms.
+     * Appeler avec : animateCount(el, 1200, 800)
+     * Retourne une promesse résolue à la fin.
+     */
+    animateCount(el, target, duration = 700) {
+      if (!el || isNaN(target)) return;
+      const start     = performance.now();
+      const isFloat   = target % 1 !== 0;
+      const easeFn    = t => 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const frame = (now) => {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const value = easeFn(progress) * target;
+        el.textContent = isFloat ? value.toFixed(1) : Math.round(value);
+        if (progress < 1) requestAnimationFrame(frame);
+        else el.textContent = isFloat ? target.toFixed(1) : target;
+      };
+      requestAnimationFrame(frame);
+    },
+
+    /**
+     * Lance les compteurs sur tous les éléments .stat-count visibles.
+     * Appelé après loadStats() et loadAdminData().
+     */
+    runCounters() {
+      this.$nextTick(() => {
+        document.querySelectorAll('[data-count]').forEach(el => {
+          const target = parseFloat(el.getAttribute('data-count'));
+          this.animateCount(el, target, 800);
+        });
+      });
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // TIKTOK
+    // ─────────────────────────────────────────────────────────────────────
+    async checkTikTokStatus() {
+      try {
+        const data = await this.apiJson('/videos/tiktok/status/');
+        this.tiktokConnected = data.connected || false;
+        this.tiktokOpenId    = data.open_id   || '';
+      } catch (e) { this.tiktokConnected = false; }
+    },
+
+    async connectTikTok() {
+      this.tiktokLoading = true;
+      try {
+        const data = await this.apiJson('/videos/tiktok/auth-url/');
+        if (data.error) { this.toast(data.error, 'error'); return; }
+        // Redirige vers TikTok (retour sur /?tiktok=connected)
+        window.location.href = data.url;
+      } catch (e) {
+        this.toast('Erreur lors de la connexion TikTok', 'error');
+      } finally {
+        this.tiktokLoading = false;
+      }
+    },
+
+    async disconnectTikTok() {
+      if (!confirm('Déconnecter votre compte TikTok ?')) return;
+      try {
+        await this.api('/videos/tiktok/disconnect/', { method: 'DELETE' });
+        this.tiktokConnected = false;
+        this.tiktokOpenId    = '';
+        this.toast('TikTok déconnecté', 'info');
+      } catch (e) { this.toast('Erreur', 'error'); }
+    },
+
+    async publishToTikTok(clip, privacyLevel = 'SELF_ONLY') {
+      if (this.publishingClips[clip.id]) return;
+      if (!this.tiktokConnected) {
+        this.toast('Connectez TikTok d\'abord (sidebar)', 'warn');
+        return;
+      }
+
+      this.publishingClips = { ...this.publishingClips, [clip.id]: true };
+      try {
+        const data = await this.apiJson(`/videos/clips/${clip.id}/publish/tiktok/`, {
+          method: 'POST',
+          body: JSON.stringify({ privacy_level: privacyLevel }),
+        });
+        this.toast('🚀 Publication TikTok démarrée !', 'success');
+
+        // Mettre à jour le clip localement
+        const idx = this.allClips.findIndex(c => c.id === clip.id);
+        if (idx !== -1) this.allClips[idx] = { ...this.allClips[idx], tiktok_status: 'pending' };
+        if (this.clipModal?.id === clip.id) this.clipModal = { ...this.clipModal, tiktok_status: 'pending' };
+
+        // Vérifier statut après 15s
+        setTimeout(() => this.pollTikTokClipStatus(clip.id), 15000);
+      } catch (e) {
+        this.toast('Erreur publication TikTok : ' + e.message, 'error');
+      } finally {
+        const updated = { ...this.publishingClips };
+        delete updated[clip.id];
+        this.publishingClips = updated;
+      }
+    },
+
+    async pollTikTokClipStatus(clipId) {
+      try {
+        const data = await this.apiJson(`/videos/clips/${clipId}/tiktok-status/`);
+        const idx  = this.allClips.findIndex(c => c.id === clipId);
+        if (idx !== -1) this.allClips[idx] = { ...this.allClips[idx], tiktok_status: data.tiktok_status };
+        if (this.clipModal?.id === clipId) this.clipModal = { ...this.clipModal, tiktok_status: data.tiktok_status };
+
+        if (data.tiktok_status === 'published') this.toast('✅ Clip publié sur TikTok !', 'success');
+        else if (data.tiktok_status === 'failed') this.toast('❌ Publication TikTok échouée', 'error');
+        else if (data.tiktok_status === 'pending') setTimeout(() => this.pollTikTokClipStatus(clipId), 10000);
+      } catch (e) { console.error(e); }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // PANEL ADMIN
+    // ─────────────────────────────────────────────────────────────────────
+    async loadAdminData() {
+      this.adminLoading = true;
+      try {
+        const [statsRes, usersRes] = await Promise.all([
+          this.apiJson('/auth/admin/stats/'),
+          this.apiJson('/auth/admin/users/'),
+        ]);
+        this.adminStats = statsRes.data || statsRes;
+        this.adminUsers = usersRes.data?.users || usersRes.users || [];
+        this.runCounters();
+      } catch (e) {
+        this.toast('Erreur chargement panel admin', 'error');
+      } finally {
+        this.adminLoading = false;
+      }
+    },
+
+    async adminDeleteUser(userId, email) {
+      if (!confirm(`Supprimer définitivement l'utilisateur ${email} ?\nToutes ses vidéos et clips seront supprimés.`)) return;
+      try {
+        const res = await this.api(`/auth/admin/users/${userId}/`, { method: 'DELETE' });
+        if (res.ok) {
+          this.adminUsers  = this.adminUsers.filter(u => u.id !== userId);
+          if (this.adminStats.total_users) this.adminStats.total_users--;
+          this.toast(`Utilisateur ${email} supprimé.`, 'success');
+        } else {
+          const data = await res.json();
+          this.toast(data.message || 'Erreur lors de la suppression', 'error');
+        }
+      } catch (e) {
+        this.toast('Erreur : ' + e.message, 'error');
+      }
+    },
+
+    async adminToggleActive(user) {
+      const newVal = !user.is_active;
+      try {
+        const res = await this.api(`/auth/admin/users/${user.id}/`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ is_active: newVal }),
+        });
+        if (res.ok) {
+          const idx = this.adminUsers.findIndex(u => u.id === user.id);
+          if (idx !== -1) this.adminUsers[idx] = { ...this.adminUsers[idx], is_active: newVal };
+          this.adminUsers = [...this.adminUsers]; // force Alpine reactivity
+          this.toast(newVal ? 'Compte activé' : 'Compte désactivé', 'success');
+        } else {
+          const data = await res.json();
+          this.toast(data.message || 'Erreur', 'error');
+        }
+      } catch (e) {
+        this.toast('Erreur : ' + e.message, 'error');
+      }
+    },
+
+    // ─────────────────────────────────────────────────────────────────────
+    // TOASTS
+    // ─────────────────────────────────────────────────────────────────────
+    toast(message, type = 'info') {
+      const id = ++this._toastId;
+      this.toasts.push({ id, message, type });
+      setTimeout(() => this.removeToast(id), 4000);
+    },
+
+    removeToast(id) {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+    },
+  };
+}
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DIAGNOSTIC DE CHARGEMENT (affiché uniquement si Alpine échoue)
+═══════════════════════════════════════════════════════════════ -->
+<div id="load-error-banner" style="
+  display:none; position:fixed; bottom:0; left:0; right:0; z-index:9999;
+  background:#1a0a2e; border-top:2px solid #ef4444; color:#fff;
+  padding:12px 16px; font:14px/1.4 monospace; text-align:center;">
+  ⚠️ <strong>Erreur de chargement ClipAI</strong> —
+  <span id="load-error-detail"></span><br>
+  <small style="color:#94a3b8">Redémarrez le serveur Django puis faites Ctrl+Shift+R dans votre navigateur.</small>
+</div>
+<script>
+  // Vérifie que tous les composants critiques sont chargés
+  window.addEventListener('load', function() {
+    var errors = [];
+    if (typeof tailwind === 'undefined') errors.push('Tailwind CSS non chargé (/tailwind.cdn.js)');
+    if (typeof Alpine === 'undefined')  errors.push('Alpine.js non chargé (/alpine.min.js)');
+    if (errors.length) {
+      document.getElementById('load-error-detail').textContent = errors.join(' | ');
+      document.getElementById('load-error-banner').style.display = 'block';
+      console.error('[ClipAI] Erreurs de chargement :', errors);
+    } else {
+      console.log('[ClipAI] Alpine', Alpine.version, '+ Tailwind chargés depuis le serveur local ✓');
+    }
+  });
+</script>
+
+</body>
+</html>
