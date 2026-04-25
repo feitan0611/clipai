@@ -56,7 +56,19 @@ def run_full_pipeline(video_id: str):
         _log(video, 'info', '📥 Récupération de la vidéo source…')
 
         if video.file:
-            source_path = video.file.path
+            # Essayer d'abord le chemin local (dev), sinon télécharger depuis l'URL (prod/Cloudinary)
+            try:
+                source_path = video.file.path
+                if not Path(source_path).exists():
+                    raise FileNotFoundError
+            except (NotImplementedError, FileNotFoundError, ValueError):
+                # Cloudinary : le fichier est dans le cloud → on le télécharge en local
+                file_url = video.file.url
+                _log(video, 'info', f'☁️  Téléchargement depuis le stockage cloud…')
+                import urllib.request
+                local_path = str(work_dir / 'source.mp4')
+                urllib.request.urlretrieve(file_url, local_path)
+                source_path = local_path
         elif video.source_url:
             _log(video, 'info', f'⬇️  Téléchargement depuis {video.source_url[:60]}…')
             from .extractor import VideoExtractor as VE
