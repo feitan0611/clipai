@@ -137,12 +137,11 @@ class VideoExtractor:
         # Nom de fichier fixe pour éviter les problèmes de récupération de chemin
         output_template = str(out_dir / 'source.%(ext)s')
 
-        result = subprocess.run([
+        import os, tempfile as _tf
+
+        cmd = [
             'yt-dlp',
-            # Contourne la détection bot de YouTube (serveur cloud)
             '--extractor-args', 'youtube:player_client=tv_embedded,ios,android',
-            '--add-header', 'User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            # Priorité 1080p → 720p → meilleur disponible
             '--format', (
                 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]'
                 '/bestvideo[height<=1080]+bestaudio'
@@ -154,8 +153,27 @@ class VideoExtractor:
             '--no-playlist',
             '--merge-output-format', 'mp4',
             '--no-warnings',
-            url,
-        ], capture_output=True, text=True, timeout=600)
+        ]
+
+        # Utiliser les cookies YouTube si définis en variable d'environnement
+        yt_cookies = os.environ.get('YOUTUBE_COOKIES', '').strip()
+        cookies_file = None
+        if yt_cookies:
+            tmp = _tf.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+            tmp.write(yt_cookies)
+            tmp.close()
+            cookies_file = tmp.name
+            cmd += ['--cookies', cookies_file]
+
+        cmd.append(url)
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+        if cookies_file:
+            try:
+                os.unlink(cookies_file)
+            except Exception:
+                pass
 
         if result.returncode != 0:
             # Extraire le vrai message d'erreur
