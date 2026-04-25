@@ -7,19 +7,20 @@ DATABASES = {
     'default': env.db('DATABASE_URL')
 }
 
-# Sécurité HTTPS
-SECURE_SSL_REDIRECT = True
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# Railway gère SSL au niveau du proxy — on lui indique comment détecter HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = False  # Railway redirige déjà vers HTTPS en amont
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
-# CORS — Railway injectera l'URL dans la variable d'env CORS_ALLOWED_ORIGINS
+# CORS
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 
-# Fichiers statiques via WhiteNoise (déjà configuré dans base.py)
+# Fichiers statiques via WhiteNoise
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Email en prod
+# Email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# Axes désactivé en prod pour éviter les blocages de cache
+AXES_ENABLED = False
