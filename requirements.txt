@@ -11,6 +11,8 @@ gunicorn==22.0.0
 whitenoise==6.7.0
 psycopg2-binary==2.9.9
 pillow==10.4.0
+cloudinary==1.41.0
+django-cloudinary-storage==0.3.0
 anthropic==0.49.0
 httpx==0.27.0
 anyio==4.4.0
