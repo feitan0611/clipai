@@ -1,8 +1,7 @@
-[build]
+﻿[build]
 builder = "nixpacks"
 
 [deploy]
-startCommand = "gunicorn clipai.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+startCommand = "python manage.py migrate --noinput && gunicorn clipai.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
 healthcheckPath = "/api/auth/health/"
 healthcheckTimeout = 30
-restartPolicyType = "on_failure"
