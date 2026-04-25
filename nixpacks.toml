@@ -1,0 +1,11 @@
+﻿[phases.setup]
+nixPkgs = ["python311", "gcc", "libpq"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = []
+
+[start]
+cmd = "python manage.py migrate --noinput && gunicorn clipai.wsgi:application --bind 0.0.0.0:\ --workers 2 --timeout 120"
