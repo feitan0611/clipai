@@ -140,8 +140,8 @@ class VideoExtractor:
         result = subprocess.run([
             'yt-dlp',
             # Contourne la détection bot de YouTube (serveur cloud)
-            '--extractor-args', 'youtube:player_client=android,web',
-            '--add-header', 'User-Agent:Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36',
+            '--extractor-args', 'youtube:player_client=tv_embedded,ios,android',
+            '--add-header', 'User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
             # Priorité 1080p → 720p → meilleur disponible
             '--format', (
                 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]'

@@ -24,7 +24,7 @@ pydantic==2.7.4
 pydantic-core==2.18.4
 annotated-types==0.7.0
 stripe==10.11.0
-yt-dlp==2024.10.7
+yt-dlp
 requests==2.32.3
 urllib3==2.2.2
 certifi==2024.7.4
